@@ -57,6 +57,18 @@
 					fsl,voltage = <MXS_VOLTAGE_HIGH>;
 					fsl,pull-up = <MXS_PULL_DISABLE>;
 				};
+
+				display_pins: display_pins@0 {
+					reg = <0>;
+					fsl,pinmux-ids = <
+						MX23_PAD_I2C_SCL__GPIO_0_30
+						MX23_PAD_I2C_SDA__GPIO_0_31
+					>;
+					fsl,drive-strength = <MXS_DRIVE_4mA>;
+					fsl,voltage = <MXS_VOLTAGE_HIGH>;
+					fsl,pull-up = <MXS_PULL_DISABLE>;
+				};
+
 			};
 
 			ssp1: ssp@80034000 {
@@ -66,6 +78,19 @@
 				pinctrl-names = "default";
 				pinctrl-0 = <&spi2_pins_a>;
 				status = "okay";
+
+				display: display@0 {
+					reg = <0>;
+					compatible = "epson,s1d15g00";
+					pinctrl-names = "default";
+					pinctrl-0 = <&display_pins>;
+					spi-max-frequency = <4000000>;
+					spi-cpha;
+					spi-cpol;
+					buswidth = <9>;
+					led-gpios = <&gpio0 31 GPIO_ACTIVE_HIGH>;
+					reset-gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
+				};
 			};
 		};
 
@@ -89,7 +114,7 @@
 			auart0: serial@8006c000 {
 				pinctrl-names = "default";
 				pinctrl-0 = <&auart0_2pins_a>;
-				status = "okay";
+				status = "disabled";
 			};
 
 			usbphy0: usbphy@8007c000 {
