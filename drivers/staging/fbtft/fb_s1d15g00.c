@@ -152,7 +152,7 @@ static int init_display(struct fbtft_par *par)
 
 	par->fbtftops.reset(par);
 
-	write_reg(par, EPSON_DISCTL, 0x00, 0x20, 0x00); /* display reset */
+	write_reg(par, EPSON_DISCTL, 0x00, 0x20, 0x0a); /* display reset */
 	write_reg(par, EPSON_COMSCN, 0x01); /* COM scan */
 	write_reg(par, EPSON_OSCON); /* internal oscillators on */
 
