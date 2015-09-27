@@ -951,7 +951,7 @@ static int mxs_codec_driver_probe(struct snd_soc_codec *codec)
 	mxs_codec_startup(codec);
 
 	/* leading to standby state */
-	ret = mxs_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
+	ret = snd_soc_codec_force_bias_level(codec, SND_SOC_BIAS_STANDBY);
 	if (ret)
 		goto err;
 
