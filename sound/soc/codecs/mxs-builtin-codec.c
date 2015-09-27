@@ -589,6 +589,13 @@ static int dac_put_volsw(struct snd_kcontrol *kcontrol,
 	int reg, l, r;
 	int i;
 
+	/* 
+         * During probe the driver data could be NULL, because of a
+         * race condition. So avoid a NULL pointer dereference here.
+         */
+	if (!mxs_adc)
+		return -EAGAIN;
+
 	i = ucontrol->value.integer.value[0];
 	l = dac_volumn_control_word[i];
 	/*Get dac volume for left channel */
