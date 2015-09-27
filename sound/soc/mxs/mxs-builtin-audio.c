@@ -61,8 +61,8 @@ static int mxsadc_audio_probe_dt(struct platform_device *pdev)
 	mxs_adc_dai_link[0].platform_name = NULL;
 	mxs_adc_dai_link[0].platform_of_node = cpu_dai_np;
 
-//	of_node_put(codec_np);
-//	of_node_put(cpu_dai_np);
+	of_node_put(codec_np);
+	of_node_put(cpu_dai_np);
 
 	return ret;
 }
