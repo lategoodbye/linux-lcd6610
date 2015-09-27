@@ -1060,21 +1060,21 @@ static int mxs_adc_probe(struct platform_device *pdev)
 	mxs_adc->clk = devm_clk_get(&pdev->dev, "filt");
 	if (IS_ERR(mxs_adc->clk)) {
 		ret = PTR_ERR(mxs_adc->clk);
-		dev_err(&pdev->dev, "%s: Clock initialization failed\n", __func__);
+		dev_err(&pdev->dev, "Clock initialization failed: %d\n", ret);
 		return ret;
 	}
 
 	/* Turn on audio clock */
 	ret = clk_prepare_enable(mxs_adc->clk);
-	if (unlikely(ret != 0)) {
-		dev_err(&pdev->dev, "%s: Clock prepare or enable failed\n", __func__);
+	if (ret) {
+		dev_err(&pdev->dev, "Clock prepare or enable failed: %d\n", ret);
 		return ret;
 	}
 
 	ret = snd_soc_register_codec(&pdev->dev,
 			&mxs_codec_driver,&mxs_codec_dai_driver, 1);
-	if (unlikely(ret != 0)) {
-		dev_err(&pdev->dev, "Codec registration failed\n");
+	if (ret) {
+		dev_err(&pdev->dev, "Codec registration failed: %d\n", ret);
 		goto disable_clk;
 	}
 
