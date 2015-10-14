@@ -33,7 +33,7 @@
 
 /* TODO Use codec IO function soc snd write etc, instead of __writel __readl */
 
-struct mxs_adc_priv {
+struct mxs_codec_priv {
 	void __iomem *ain_base;
 	void __iomem *aout_base;
 	void __iomem *rtc_base;
@@ -69,7 +69,7 @@ static unsigned int mxs_regmap[] = {
 	HW_AUDIOIN_DATA,
 };
 
-static void __iomem *mxs_getreg(struct mxs_adc_priv *mxs_adc, int i)
+static void __iomem *mxs_getreg(struct mxs_codec_priv *mxs_adc, int i)
 {
 	if (i <= 16)
 		return mxs_adc->aout_base + mxs_regmap[i];
@@ -133,7 +133,7 @@ static void mxs_codec_write_cache(struct snd_soc_codec *codec, unsigned int reg,
 
 static int mxs_codec_write(struct snd_soc_codec *codec, unsigned int reg, unsigned int value)
 {
-	struct mxs_adc_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
+	struct mxs_codec_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
 	unsigned int reg_val;
 	unsigned int mask = 0xffff;
 
@@ -156,7 +156,7 @@ static int mxs_codec_write(struct snd_soc_codec *codec, unsigned int reg, unsign
 
 static unsigned int mxs_codec_read(struct snd_soc_codec *codec, unsigned int reg)
 {
-	struct mxs_adc_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
+	struct mxs_codec_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
 	unsigned int reg_val;
 
 	if (reg >= ADC_REGNUM)
@@ -202,7 +202,7 @@ static void mxs_codec_sync_reg_cache(struct snd_soc_codec *codec)
 /* Codec routines */
 #define VAG_BASE_VALUE  ((1400/2 - 625)/25)
 
-static void mxs_codec_dac_set_vag(struct mxs_adc_priv *mxs_adc)
+static void mxs_codec_dac_set_vag(struct mxs_codec_priv *mxs_adc)
 {
 	u32 refctrl_val = __raw_readl(mxs_adc->aout_base + HW_AUDIOOUT_REFCTRL);
 
@@ -217,7 +217,7 @@ static void mxs_codec_dac_set_vag(struct mxs_adc_priv *mxs_adc)
 	__raw_writel(refctrl_val, mxs_adc->aout_base + HW_AUDIOOUT_REFCTRL);
 }
 
-static bool mxs_codec_dac_is_capless(struct mxs_adc_priv *mxs_adc)
+static bool mxs_codec_dac_is_capless(struct mxs_codec_priv *mxs_adc)
 {
 	if ((__raw_readl(mxs_adc->aout_base + HW_AUDIOOUT_PWRDN)
 		& BM_AUDIOOUT_PWRDN_CAPLESS) == 0)
@@ -226,7 +226,7 @@ static bool mxs_codec_dac_is_capless(struct mxs_adc_priv *mxs_adc)
 		return true;
 }
 
-static void mxs_codec_dac_arm_short_cm(struct mxs_adc_priv *mxs_adc, bool bShort)
+static void mxs_codec_dac_arm_short_cm(struct mxs_codec_priv *mxs_adc, bool bShort)
 {
 	__raw_writel(BF(3, AUDIOOUT_ANACTRL_SHORTMODE_CM),
 		      mxs_adc->aout_base + HW_AUDIOOUT_ANACTRL_CLR);
@@ -237,7 +237,7 @@ static void mxs_codec_dac_arm_short_cm(struct mxs_adc_priv *mxs_adc, bool bShort
 		      mxs_adc->aout_base + HW_AUDIOOUT_ANACTRL_SET);
 }
 
-static void mxs_codec_dac_arm_short_lr(struct mxs_adc_priv *mxs_adc, bool bShort)
+static void mxs_codec_dac_arm_short_lr(struct mxs_codec_priv *mxs_adc, bool bShort)
 {
 	__raw_writel(BF(3, AUDIOOUT_ANACTRL_SHORTMODE_LR),
 		      mxs_adc->aout_base + HW_AUDIOOUT_ANACTRL_CLR);
@@ -248,7 +248,7 @@ static void mxs_codec_dac_arm_short_lr(struct mxs_adc_priv *mxs_adc, bool bShort
 		      mxs_adc->aout_base + HW_AUDIOOUT_ANACTRL_SET);
 }
 
-static void mxs_codec_dac_set_short_trip_level(struct mxs_adc_priv *mxs_adc, u8 u8level)
+static void mxs_codec_dac_set_short_trip_level(struct mxs_codec_priv *mxs_adc, u8 u8level)
 {
 	__raw_writel(__raw_readl(mxs_adc->aout_base +
 		HW_AUDIOOUT_ANACTRL)
@@ -259,7 +259,7 @@ static void mxs_codec_dac_set_short_trip_level(struct mxs_adc_priv *mxs_adc, u8 
 		mxs_adc->aout_base + HW_AUDIOOUT_ANACTRL);
 }
 
-static void mxs_codec_dac_arm_short(struct mxs_adc_priv *mxs_adc, bool bLatchCM, bool bLatchLR)
+static void mxs_codec_dac_arm_short(struct mxs_codec_priv *mxs_adc, bool bLatchCM, bool bLatchLR)
 {
 	if (bLatchCM) {
 		if (mxs_codec_dac_is_capless(mxs_adc))
@@ -274,7 +274,7 @@ static void mxs_codec_dac_arm_short(struct mxs_adc_priv *mxs_adc, bool bLatchCM,
 }
 
 static void
-mxs_codec_dac_power_on(struct mxs_adc_priv *mxs_adc)
+mxs_codec_dac_power_on(struct mxs_codec_priv *mxs_adc)
 {
 	/* Ungate DAC clocks */
 	__raw_writel(BM_AUDIOOUT_CTRL_CLKGATE,
@@ -317,7 +317,7 @@ mxs_codec_dac_power_on(struct mxs_adc_priv *mxs_adc)
 }
 
 static void
-mxs_codec_dac_power_down(struct mxs_adc_priv *mxs_adc)
+mxs_codec_dac_power_down(struct mxs_codec_priv *mxs_adc)
 {
 	/* Disable the audioout */
 	 __raw_writel(BM_AUDIOOUT_CTRL_RUN,
@@ -360,7 +360,7 @@ mxs_codec_dac_power_down(struct mxs_adc_priv *mxs_adc)
 }
 
 static void
-mxs_codec_adc_power_on(struct mxs_adc_priv *mxs_adc)
+mxs_codec_adc_power_on(struct mxs_codec_priv *mxs_adc)
 {
 	u32 reg;
 
@@ -428,7 +428,7 @@ mxs_codec_adc_power_on(struct mxs_adc_priv *mxs_adc)
 }
 
 static void
-mxs_codec_adc_power_down(struct mxs_adc_priv *mxs_adc)
+mxs_codec_adc_power_down(struct mxs_codec_priv *mxs_adc)
 {
 	/* Mute ADC channels */
 	__raw_writel(BM_AUDIOIN_ADCVOL_MUTE,
@@ -449,7 +449,7 @@ mxs_codec_adc_power_down(struct mxs_adc_priv *mxs_adc)
 		      mxs_adc->ain_base + HW_AUDIOIN_MICLINE_SET);
 }
 
-static void mxs_codec_dac_enable(struct mxs_adc_priv *mxs_adc)
+static void mxs_codec_dac_enable(struct mxs_codec_priv *mxs_adc)
 {
 	/* Move DAC codec out of reset */
 	__raw_writel(BM_AUDIOOUT_CTRL_SFTRST,
@@ -476,12 +476,12 @@ static void mxs_codec_dac_enable(struct mxs_adc_priv *mxs_adc)
 	mxs_codec_dac_power_on(mxs_adc);
 }
 
-static void mxs_codec_dac_disable(struct mxs_adc_priv *mxs_adc)
+static void mxs_codec_dac_disable(struct mxs_codec_priv *mxs_adc)
 {
 	mxs_codec_dac_power_down(mxs_adc);
 }
 
-static void mxs_codec_adc_enable(struct mxs_adc_priv *mxs_adc)
+static void mxs_codec_adc_enable(struct mxs_codec_priv *mxs_adc)
 {
 	/* Move ADC codec out of reset */
 	__raw_writel(BM_AUDIOIN_CTRL_SFTRST,
@@ -491,14 +491,14 @@ static void mxs_codec_adc_enable(struct mxs_adc_priv *mxs_adc)
 	mxs_codec_adc_power_on(mxs_adc);
 }
 
-static void mxs_codec_adc_disable(struct mxs_adc_priv *mxs_adc)
+static void mxs_codec_adc_disable(struct mxs_codec_priv *mxs_adc)
 {
 	mxs_codec_adc_power_down(mxs_adc);
 }
 
 static void mxs_codec_startup(struct snd_soc_codec *codec)
 {
-	struct mxs_adc_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
+	struct mxs_codec_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
 
 	/* Soft reset DAC block */
 	__raw_writel(BM_AUDIOOUT_CTRL_SFTRST,
@@ -523,7 +523,7 @@ static void mxs_codec_startup(struct snd_soc_codec *codec)
 
 static void mxs_codec_stop(struct snd_soc_codec *codec)
 {
-	struct mxs_adc_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
+	struct mxs_codec_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
 
 	mxs_codec_dac_disable(mxs_adc);
 	mxs_codec_adc_disable(mxs_adc);
@@ -545,7 +545,7 @@ static int dac_get_volsw(struct snd_kcontrol *kcontrol,
 			 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-	struct mxs_adc_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
+	struct mxs_codec_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
 	int reg, l, r;
 	int i;
 
@@ -585,7 +585,7 @@ static int dac_put_volsw(struct snd_kcontrol *kcontrol,
 			 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-	struct mxs_adc_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
+	struct mxs_codec_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
 	int reg, l, r;
 	int i;
 
@@ -662,7 +662,7 @@ static const struct snd_kcontrol_new mxs_snd_controls[] = {
 static int pga_event(struct snd_soc_dapm_widget *w,
 			struct snd_kcontrol *kcontrol, int event)
 {
-	struct mxs_adc_priv *mxs_adc = snd_soc_codec_get_drvdata(snd_soc_dapm_to_codec(w->dapm));
+	struct mxs_codec_priv *mxs_adc = snd_soc_codec_get_drvdata(snd_soc_dapm_to_codec(w->dapm));
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
@@ -688,7 +688,7 @@ static int pga_event(struct snd_soc_dapm_widget *w,
 static int adc_event(struct snd_soc_dapm_widget *w,
 			struct snd_kcontrol *kcontrol, int event)
 {
-	struct mxs_adc_priv *mxs_adc = snd_soc_codec_get_drvdata(snd_soc_dapm_to_codec(w->dapm));
+	struct mxs_codec_priv *mxs_adc = snd_soc_codec_get_drvdata(snd_soc_dapm_to_codec(w->dapm));
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
@@ -781,7 +781,7 @@ static const struct snd_soc_dapm_route mxs_dapm_routes[] = {
 static int mxs_set_bias_level(struct snd_soc_codec *codec,
 				   enum snd_soc_bias_level level)
 {
-	struct mxs_adc_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
+	struct mxs_codec_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
 
 	pr_debug("dapm level %d\n", level);
 	switch (level) {
@@ -816,7 +816,7 @@ static int mxs_pcm_hw_params(struct snd_pcm_substream *substream,
 				  struct snd_soc_dai *dai)
 {
 	struct snd_soc_codec *codec = dai->codec;
-	struct mxs_adc_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
+	struct mxs_codec_priv *mxs_adc = snd_soc_codec_get_drvdata(codec);
 	int playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? 1 : 0;
 	int i;
 	u32 srr_value = 0;
@@ -876,7 +876,7 @@ static int mxs_pcm_hw_params(struct snd_pcm_substream *substream,
 /* mute the codec used by alsa core */
 static int mxs_codec_dig_mute(struct snd_soc_dai *codec_dai, int mute)
 {
-	struct mxs_adc_priv *mxs_adc = snd_soc_codec_get_drvdata(codec_dai->codec);
+	struct mxs_codec_priv *mxs_adc = snd_soc_codec_get_drvdata(codec_dai->codec);
 	int l, r;
 	int ll, rr;
 	u32 reg, reg1, reg2;
@@ -1014,11 +1014,11 @@ static struct snd_soc_codec_driver mxs_codec_driver = {
 /* Underlying platform device that registers codec */
 static int mxs_adc_probe(struct platform_device *pdev)
 {
-	struct mxs_adc_priv *mxs_adc;
+	struct mxs_codec_priv *mxs_adc;
 	struct resource *r;
 	int ret;
 
-	mxs_adc = devm_kzalloc(&pdev->dev, sizeof(struct mxs_adc_priv), GFP_KERNEL);
+	mxs_adc = devm_kzalloc(&pdev->dev, sizeof(struct mxs_codec_priv), GFP_KERNEL);
 	if (!mxs_adc)
 		return -ENOMEM;
 
@@ -1094,7 +1094,7 @@ disable_clk:
 
 static int mxs_adc_remove(struct platform_device *pdev)
 {
-	struct mxs_adc_priv *mxs_adc = platform_get_drvdata(pdev);
+	struct mxs_codec_priv *mxs_adc = platform_get_drvdata(pdev);
 
 	clk_disable_unprepare(mxs_adc->clk);
 	snd_soc_unregister_codec(&pdev->dev);
