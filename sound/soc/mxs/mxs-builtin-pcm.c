@@ -18,6 +18,10 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+/* TODO since this file is nearly identical to mxs-pcm.c this file should
+ * be removed
+ */
+
 #include <linux/device.h>
 #include <linux/init.h>
 #include <linux/module.h>

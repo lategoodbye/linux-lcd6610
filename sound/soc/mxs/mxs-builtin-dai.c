@@ -79,6 +79,7 @@ static void mxs_adc_work(struct work_struct *work)
 	while (true) {
 		__raw_writel(BM_AUDIOOUT_PWRDN_HEADPHONE,
 		      mxs_adc->audioout_base + HW_AUDIOOUT_PWRDN_CLR);
+		/* uninterruptible sleep for ~ 20 msec */
 		msleep(10);
 		if ((__raw_readl(mxs_adc->audioout_base + HW_AUDIOOUT_ANACTRL)
 			& BM_AUDIOOUT_ANACTRL_SHORT_LR_STS) != 0) {
@@ -97,6 +98,7 @@ static void mxs_adc_work(struct work_struct *work)
 			printk(KERN_WARNING "INFO : Headphone LR no longer short!\r\n");
 			break;
 		}
+		/* uninterruptible sleep for ~ 1 sec */
 		msleep(1000);
 	}
 
@@ -137,6 +139,8 @@ static void mxs_adc_ramp_work(struct work_struct *work)
 	    BF_AUDIOIN_ADCVOLUME_VOLUME_RIGHT(ADC_VOLUME_MIN);
 	__raw_writel(reg2,
 		mxs_adc->audioin_base + HW_AUDIOIN_ADCVOLUME);
+
+	/* uninterruptible sleep for ~ 20 msec */
 	msleep(1);
 
 	l = (reg & BM_AUDIOIN_ADCVOLUME_VOLUME_LEFT) >>
@@ -154,6 +158,8 @@ static void mxs_adc_ramp_work(struct work_struct *work)
 		    BF_AUDIOIN_ADCVOLUME_VOLUME_RIGHT(rr);
 		__raw_writel(reg2,
 		    mxs_adc->audioin_base + HW_AUDIOIN_ADCVOLUME);
+
+		/* uninterruptible sleep for ~ 20 msec */
 		msleep(1);
 	}
 	adc_ramp_done = 1;
@@ -199,6 +205,8 @@ static void mxs_dac_ramp_work(struct work_struct *work)
 			| BF_AUDIOOUT_HPVOL_VOL_RIGHT(rr);
 		__raw_writel(reg,
 			mxs_adc->audioout_base + HW_AUDIOOUT_HPVOL);
+
+		/* uninterruptible sleep for ~ 20 msec */
 		msleep(1);
 	}
 	dac_ramp_done = 1;
@@ -353,6 +361,8 @@ static int mxs_trigger(struct snd_pcm_substream *substream,
 			/* disable the fifo error interrupt */
 			__raw_writel(BM_AUDIOOUT_CTRL_FIFO_ERROR_IRQ_EN,
 				mxs_adc->audioout_base + HW_AUDIOOUT_CTRL_CLR);
+
+			/* block everything for 50 msec :-( */
 			mdelay(50);
 		} else {
 			if (adc_ramp_done == 0) {

@@ -671,6 +671,7 @@ static int pga_event(struct snd_soc_dapm_widget *w,
 			mxs_adc->aout_base + HW_AUDIOOUT_ANACTRL_SET);
 		__raw_writel(BM_RTC_PERSISTENT0_RELEASE_GND,
 			mxs_adc->rtc_base + HW_RTC_PERSISTENT0_SET);
+		/* uninterruptible sleep for ~ 100 msec */
 		msleep(100);
 		break;
 	case SND_SOC_DAPM_POST_PMU:
@@ -694,6 +695,7 @@ static int adc_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_PRE_PMU:
 		__raw_writel(BM_RTC_PERSISTENT0_RELEASE_GND,
 			mxs_adc->rtc_base + HW_RTC_PERSISTENT0_SET);
+		/* uninterruptible sleep for ~ 100 msec */
 		msleep(100);
 		break;
 	case SND_SOC_DAPM_POST_PMD:
@@ -905,6 +907,7 @@ static int mxs_codec_dig_mute(struct snd_soc_dai *codec_dai, int mute)
 				| BF_AUDIOOUT_DACVOLUME_VOLUME_RIGHT(rr);
 			__raw_writel(reg2,
 				mxs_adc->aout_base + HW_AUDIOOUT_DACVOLUME);
+			/* uninterruptible sleep for ~ 20 msec */
 			msleep(1);
 		}
 
