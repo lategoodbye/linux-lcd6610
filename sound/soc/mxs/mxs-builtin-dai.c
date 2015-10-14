@@ -557,7 +557,6 @@ failed_pdev_alloc:
 
 static int mxs_adc_remove(struct platform_device *pdev)
 {
-	mxs_adc_pcm_platform_unregister(&pdev->dev);
 	snd_soc_unregister_component(&pdev->dev);
 
 	return 0;

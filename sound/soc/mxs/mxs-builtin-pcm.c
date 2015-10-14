@@ -55,14 +55,8 @@ static const struct snd_dmaengine_pcm_config mxs_dmaengine_pcm_config = {
 
 int mxs_adc_pcm_platform_register(struct device *dev)
 {
-	return snd_dmaengine_pcm_register(dev, &mxs_dmaengine_pcm_config, 0);
+	return devm_snd_dmaengine_pcm_register(dev, &mxs_dmaengine_pcm_config, 0);
 }
 EXPORT_SYMBOL_GPL(mxs_adc_pcm_platform_register);
-
-void mxs_adc_pcm_platform_unregister(struct device *dev)
-{
-	snd_dmaengine_pcm_unregister(dev);
-}
-EXPORT_SYMBOL_GPL(mxs_adc_pcm_platform_unregister);
 
 MODULE_LICENSE("GPL");

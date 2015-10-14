@@ -20,6 +20,5 @@
 #define _MXS_BUILTIN_PCM_H
 
 int mxs_adc_pcm_platform_register(struct device *dev);
-void mxs_adc_pcm_platform_unregister(struct device *dev);
 
 #endif
