@@ -375,7 +375,7 @@ static int mxs_trigger(struct snd_pcm_substream *substream,
 		break;
 
 	default:
-		printk(KERN_ERR "TRIGGER ERROR\n");
+		dev_err(cpu_dai->dev, "TRIGGER ERROR\n");
 		ret = -EINVAL;
 	}
 
@@ -522,24 +522,24 @@ static int mxs_adc_probe(struct platform_device *pdev)
 	ret = devm_request_irq(&pdev->dev, mxs_adc->dma_adc_err_irq, mxs_err_irq, 0, "MXS DAC and ADC Error",
 			  &mxs_adc->adc_err_irq_data);
 	if (ret) {
-		printk(KERN_ERR "%s: Unable to request ADC/DAC error irq %d\n",
-		       __func__, mxs_adc->dma_adc_err_irq);
+		dev_err(&pdev->dev, "Unable to request ADC/DAC error irq %d\n",
+		        mxs_adc->dma_adc_err_irq);
 		return ret;
 	}
 
 	ret = devm_request_irq(&pdev->dev, mxs_adc->dma_dac_err_irq, mxs_err_irq, 0, "MXS DAC and ADC Error",
 			  &mxs_adc->dac_err_irq_data);
 	if (ret) {
-		printk(KERN_ERR "%s: Unable to request ADC/DAC error irq %d\n",
-		       __func__, mxs_adc->dma_dac_err_irq);
+		dev_err(&pdev->dev, "Unable to request ADC/DAC error irq %d\n",
+		        mxs_adc->dma_dac_err_irq);
 		return ret;
 	}
 
 	ret = devm_request_irq(&pdev->dev, mxs_adc->hp_short_irq, mxs_short_irq,
 		IRQF_SHARED, "MXS DAC and ADC HP SHORT", mxs_adc);
 	if (ret) {
-		printk(KERN_ERR "%s: Unable to request ADC/DAC HP SHORT irq %d\n",
-		       __func__, mxs_adc->hp_short_irq);
+		dev_err(&pdev->dev, "Unable to request ADC/DAC HP SHORT irq %d\n",
+		        mxs_adc->hp_short_irq);
 		return ret;
 	}
 
