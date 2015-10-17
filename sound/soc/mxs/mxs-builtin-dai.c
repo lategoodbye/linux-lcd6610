@@ -302,9 +302,6 @@ static int mxs_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 
 		if (playback) {
-			/* enable the fifo error interrupt */
-			__raw_writel(BM_AUDIOOUT_CTRL_FIFO_ERROR_IRQ_EN,
-			mxs_adc->audioout_base + HW_AUDIOOUT_CTRL_SET);
 			/* write a data to data reg to trigger the transfer */
 			__raw_writel(0x0,
 				mxs_adc->audioout_base + HW_AUDIOOUT_DATA);
@@ -358,9 +355,6 @@ static int mxs_trigger(struct snd_pcm_substream *substream,
 			  mxs_adc->audioout_base + HW_AUDIOOUT_HPVOL_SET);
 			__raw_writel(BM_AUDIOOUT_SPEAKERCTRL_MUTE,
 			  mxs_adc->audioout_base + HW_AUDIOOUT_SPEAKERCTRL_SET);
-			/* disable the fifo error interrupt */
-			__raw_writel(BM_AUDIOOUT_CTRL_FIFO_ERROR_IRQ_EN,
-				mxs_adc->audioout_base + HW_AUDIOOUT_CTRL_CLR);
 
 			/* block everything for 50 msec :-( */
 			mdelay(50);
@@ -414,6 +408,21 @@ static int mxs_startup(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int mxs_prepare(struct snd_pcm_substream *substream,
+		       struct snd_soc_dai *cpu_dai)
+{
+	struct mxs_adc_priv *mxs_adc = snd_soc_dai_get_drvdata(cpu_dai);
+	int playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ? 1 : 0;
+
+	/* enable FIFO error irqs */
+	if (playback) {
+		__raw_writel(BM_AUDIOOUT_CTRL_FIFO_ERROR_IRQ_EN,
+			     mxs_adc->audioout_base + HW_AUDIOOUT_CTRL_SET);
+	}
+
+	return 0;
+}
+
 static void mxs_shutdown(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *cpu_dai)
 {
@@ -436,6 +445,7 @@ static void mxs_shutdown(struct snd_pcm_substream *substream,
 static const struct snd_soc_dai_ops mxs_adc_dai_ops = {
 	.startup = mxs_startup,
 	.trigger = mxs_trigger,
+	.prepare = mxs_prepare,
 	.shutdown = mxs_shutdown,
 };
 
