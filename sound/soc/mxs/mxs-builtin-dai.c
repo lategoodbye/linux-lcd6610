@@ -485,6 +485,8 @@ static int mxs_adc_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
 	struct mxs_adc_priv *mxs_adc;
+	struct resource *res;
+	char *pname;
 	int ret = 0;
 
 	if (!np)
@@ -494,15 +496,36 @@ static int mxs_adc_probe(struct platform_device *pdev)
 	if (!mxs_adc)
 		return -ENOMEM;
 
-	mxs_adc->audioout_base = devm_ioremap(&pdev->dev, 0x80048000, 0x2000);
+	pname = "audioout";
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, pname);
+	if (IS_ERR(res)) {
+		dev_err(&pdev->dev, "Missing '%s' IO resource\n", pname);
+		return PTR_ERR(res);
+	}
+	mxs_adc->audioout_base = devm_ioremap_nocache(&pdev->dev, res->start,
+						      resource_size(res));
 	if (IS_ERR(mxs_adc->audioout_base))
 		return PTR_ERR(mxs_adc->audioout_base);
 
-	mxs_adc->audioin_base = devm_ioremap(&pdev->dev, 0x8004c000, 0x2000);
+	pname = "audioin";
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, pname);
+	if (IS_ERR(res)) {
+		dev_err(&pdev->dev, "Missing '%s' IO resource\n", pname);
+		return PTR_ERR(res);
+	}
+	mxs_adc->audioin_base = devm_ioremap_nocache(&pdev->dev, res->start,
+						     resource_size(res));
 	if (IS_ERR(mxs_adc->audioin_base))
 		return PTR_ERR(mxs_adc->audioin_base);
 
-	mxs_adc->rtc_base = devm_ioremap(&pdev->dev, 0x8005c000, 0x2000);
+	pname = "rtc";
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, pname);
+	if (IS_ERR(res)) {
+		dev_err(&pdev->dev, "Missing '%s' IO resource\n", pname);
+		return PTR_ERR(res);
+	}
+	mxs_adc->rtc_base = devm_ioremap_nocache(&pdev->dev, res->start,
+						 resource_size(res));
 	if (IS_ERR(mxs_adc->rtc_base))
 		return PTR_ERR(mxs_adc->rtc_base);
 
