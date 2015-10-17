@@ -545,7 +545,7 @@ static int mxs_adc_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, mxs_adc);
 
-	ret = snd_soc_register_component(&pdev->dev, &mxs_adc_component, &mxs_adc_dai, 1);
+	ret = devm_snd_soc_register_component(&pdev->dev, &mxs_adc_component, &mxs_adc_dai, 1);
 	if (ret) {
 		dev_err(&pdev->dev, "register DAI failed\n");
 		return ret;
@@ -554,20 +554,8 @@ static int mxs_adc_probe(struct platform_device *pdev)
 	ret = mxs_adc_pcm_platform_register(&pdev->dev);
 	if (ret) {
 		dev_err(&pdev->dev, "register PCM failed: %d\n", ret);
-		goto failed_pdev_alloc;
+		return ret;
 	}
-
-	return 0;
-
-failed_pdev_alloc:
-	snd_soc_unregister_component(&pdev->dev);
-
-	return ret;
-}
-
-static int mxs_adc_remove(struct platform_device *pdev)
-{
-	snd_soc_unregister_component(&pdev->dev);
 
 	return 0;
 }
@@ -580,7 +568,6 @@ MODULE_DEVICE_TABLE(of, mxs_adc_dai_dt_ids);
 
 static struct platform_driver mxs_adc_dai_driver = {
 	.probe = mxs_adc_probe,
-	.remove = mxs_adc_remove,
 
 	.driver = {
 		.name = "mxs-builtin-cpu-dai",
