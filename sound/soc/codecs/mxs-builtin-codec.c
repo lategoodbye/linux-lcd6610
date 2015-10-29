@@ -549,6 +549,9 @@ static int dac_get_volsw(struct snd_kcontrol *kcontrol,
 	int reg, l, r;
 	int i;
 
+	if (!mxs_adc)
+		return -EINVAL;
+
 	reg = __raw_readl(mxs_adc->aout_base + HW_AUDIOOUT_DACVOLUME);
 
 	l = (reg & BM_AUDIOOUT_DACVOLUME_VOLUME_LEFT) >>
