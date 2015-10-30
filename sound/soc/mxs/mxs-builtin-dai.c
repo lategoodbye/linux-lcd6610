@@ -11,12 +11,15 @@
  * published by the Free Software Foundation.
  */
 
-#include <linux/module.h>
+#include <linux/delay.h>
+#include <linux/device.h>
+#include <linux/dma-mapping.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
-#include <linux/delay.h>
-#include <linux/dma-mapping.h>
+#include <linux/io.h>
+#include <linux/module.h>
 #include <linux/platform_device.h>
+
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>

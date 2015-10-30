@@ -13,7 +13,10 @@
 
 #include <linux/clk.h>
 #include <linux/delay.h>
+#include <linux/device.h>
+#include <linux/io.h>
 #include <linux/module.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>

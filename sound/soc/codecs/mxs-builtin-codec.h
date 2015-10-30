@@ -1,7 +1,5 @@
 #ifndef __MXS_ADC_CODEC_H
 
-#include <linux/io.h>
-
 /* MXS ADC/DAC registers */
 #define DAC_CTRL_L		0
 #define DAC_CTRL_H		1

@@ -8,16 +8,16 @@
  * published by the Free Software Foundation.
  */
 
-#include <linux/module.h>
 #include <linux/device.h>
+#include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
 #include <sound/jack.h>
 #include <sound/soc-dapm.h>
-#include <asm/mach-types.h>
 
 static struct snd_soc_dai_link mxs_adc_dai_link[] = {
 	{
