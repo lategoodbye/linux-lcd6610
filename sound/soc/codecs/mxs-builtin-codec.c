@@ -1070,7 +1070,7 @@ static int mxs_adc_probe(struct platform_device *pdev)
 	}
 
 	/* Get audio clock */
-	mxs_adc->clk = devm_clk_get(&pdev->dev, "filt");
+	mxs_adc->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(mxs_adc->clk)) {
 		ret = PTR_ERR(mxs_adc->clk);
 		dev_err(&pdev->dev, "Clock initialization failed: %d\n", ret);
