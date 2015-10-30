@@ -106,7 +106,6 @@ MODULE_DEVICE_TABLE(of, mxs_adc_audio_dt_ids);
 static struct platform_driver mxs_adc_audio_driver = {
 	.driver = {
 		.name = "mxs-builtin-audio",
-		.owner = THIS_MODULE,
 		.of_match_table = mxs_adc_audio_dt_ids,
 	},
 	.probe = mxsadc_audio_probe,

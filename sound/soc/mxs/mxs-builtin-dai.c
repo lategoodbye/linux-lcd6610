@@ -604,7 +604,6 @@ static struct platform_driver mxs_adc_dai_driver = {
 
 	.driver = {
 		.name = "mxs-builtin-cpu-dai",
-		.owner = THIS_MODULE,
 		.of_match_table = mxs_adc_dai_dt_ids,
 	},
 };
