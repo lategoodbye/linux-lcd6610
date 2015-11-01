@@ -177,8 +177,11 @@ static int fbtft_request_one_gpio(struct fbtft_par *par,
 		}
 
 		/* active low translates to initially low */
-		flags = (of_flags & OF_GPIO_ACTIVE_LOW) ? GPIOF_OUT_INIT_LOW :
-							GPIOF_OUT_INIT_HIGH;
+		if (of_flags & OF_GPIO_ACTIVE_LOW)
+			flags = GPIOF_OUT_INIT_LOW | GPIOF_ACTIVE_LOW;
+		else
+			flags = GPIOF_OUT_INIT_HIGH;
+
 		ret = devm_gpio_request_one(dev, gpio, flags,
 						dev->driver->name);
 		if (ret) {
