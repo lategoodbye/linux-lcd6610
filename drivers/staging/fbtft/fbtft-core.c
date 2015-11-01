@@ -26,6 +26,7 @@
 #include <linux/init.h>
 #include <linux/fb.h>
 #include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/spi/spi.h>
 #include <linux/delay.h>
 #include <linux/uaccess.h>
@@ -288,6 +289,7 @@ void fbtft_register_backlight(struct fbtft_par *par)
 {
 	struct backlight_device *bd;
 	struct backlight_properties bl_props = { 0, };
+	struct gpio_desc *desc;
 
 	fbtft_par_dbg(DEBUG_BACKLIGHT, par, "%s()\n", __func__);
 
@@ -298,9 +300,9 @@ void fbtft_register_backlight(struct fbtft_par *par)
 	}
 
 	bl_props.type = BACKLIGHT_RAW;
-	/* Assume backlight is off, get polarity from current state of pin */
 	bl_props.power = FB_BLANK_POWERDOWN;
-	if (!gpio_get_value(par->gpio.led[0]))
+	desc = gpio_to_desc(par->gpio.led[0]);
+	if (!gpiod_is_active_low(desc))
 		bl_props.state |= BL_CORE_DRIVER1;
 
 	bd = backlight_device_register(dev_driver_string(par->info->device),
@@ -340,12 +342,15 @@ static void fbtft_set_addr_win(struct fbtft_par *par, int xs, int ys, int xe,
 
 static void fbtft_reset(struct fbtft_par *par)
 {
+	struct gpio_desc *desc;
+
 	if (par->gpio.reset == -1)
 		return;
 	fbtft_par_dbg(DEBUG_RESET, par, "%s()\n", __func__);
-	gpio_set_value(par->gpio.reset, 0);
+	desc = gpio_to_desc(par->gpio.reset);
+	gpiod_set_value(desc, 1);
 	udelay(20);
-	gpio_set_value(par->gpio.reset, 1);
+	gpiod_set_value(desc, 0);
 	mdelay(120);
 }
 
