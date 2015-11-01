@@ -82,7 +82,7 @@ static unsigned long fbtft_request_gpios_match(struct fbtft_par *par,
 
 	if (strcasecmp(gpio->name, "reset") == 0) {
 		par->gpio.reset = gpio->gpio;
-		return GPIOF_OUT_INIT_HIGH;
+		return GPIOF_OUT_INIT_HIGH | GPIOF_ACTIVE_LOW;
 	} else if (strcasecmp(gpio->name, "dc") == 0) {
 		par->gpio.dc = gpio->gpio;
 		return GPIOF_OUT_INIT_LOW;
@@ -109,7 +109,7 @@ static unsigned long fbtft_request_gpios_match(struct fbtft_par *par,
 		return GPIOF_OUT_INIT_LOW;
 	} else if (strcasecmp(gpio->name, "led_") == 0) {
 		par->gpio.led[0] = gpio->gpio;
-		return GPIOF_OUT_INIT_HIGH;
+		return GPIOF_OUT_INIT_HIGH | GPIOF_ACTIVE_LOW;
 	}
 
 	return FBTFT_GPIO_NO_MATCH;
