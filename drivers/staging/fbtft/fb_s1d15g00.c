@@ -189,6 +189,15 @@ static void set_addr_win(struct fbtft_par *par, int xs, int ys, int xe, int ye)
 	write_reg(par, EPSON_RAMWR);
 }
 
+static int set_var(struct fbtft_par *par)
+{
+	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
+
+	write_reg(par, EPSON_DATCTL, 0x00, par->bgr, 0x02);
+
+	return 0;
+}
+
 static struct fbtft_display display = {
 	.regwidth = 8,
 	.width = WIDTH,
@@ -197,6 +206,7 @@ static struct fbtft_display display = {
 		.write_vmem = write_vmem16_bus9,
 		.init_display = init_display,
 		.set_addr_win = set_addr_win,
+		.set_var = set_var,
 	},
 };
 
