@@ -8,12 +8,14 @@
  */
 #include "builtin.h"
 
+#include "util/env.h"
 #include "util/exec_cmd.h"
 #include "util/cache.h"
 #include "util/quote.h"
 #include "util/run-command.h"
 #include "util/parse-events.h"
 #include "util/parse-options.h"
+#include "util/bpf-loader.h"
 #include "util/debug.h"
 #include <api/fs/tracing_path.h>
 #include <pthread.h>
@@ -159,6 +161,20 @@ static int handle_options(const char ***argv, int *argc, int *envchanged)
 		 */
 		if (!strcmp(cmd, "--help") || !strcmp(cmd, "--version"))
 			break;
+
+		/*
+		 * Shortcut for '-h' and '-v' options to invoke help
+		 * and version command.
+		 */
+		if (!strcmp(cmd, "-h")) {
+			(*argv)[0] = "--help";
+			break;
+		}
+
+		if (!strcmp(cmd, "-v")) {
+			(*argv)[0] = "--version";
+			break;
+		}
 
 		/*
 		 * Check remaining flags.
@@ -369,6 +385,8 @@ static int run_builtin(struct cmd_struct *p, int argc, const char **argv)
 
 	status = p->fn(argc, argv, prefix);
 	exit_browser(status);
+	perf_env__exit(&perf_env);
+	bpf__clear();
 
 	if (status)
 		return status & 0xff;

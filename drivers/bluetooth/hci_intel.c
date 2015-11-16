@@ -557,6 +557,7 @@ static int intel_setup(struct hci_uart *hu)
 
 	bt_dev_dbg(hdev, "start intel_setup");
 
+	hu->hdev->set_diag = btintel_set_diag;
 	hu->hdev->set_bdaddr = btintel_set_bdaddr;
 
 	calltime = ktime_get();
@@ -1147,6 +1148,7 @@ static struct sk_buff *intel_dequeue(struct hci_uart *hu)
 static const struct hci_uart_proto intel_proto = {
 	.id		= HCI_UART_INTEL,
 	.name		= "Intel",
+	.manufacturer	= 2,
 	.init_speed	= 115200,
 	.oper_speed	= 3000000,
 	.open		= intel_open,
@@ -1165,22 +1167,6 @@ static const struct acpi_device_id intel_acpi_match[] = {
 	{ },
 };
 MODULE_DEVICE_TABLE(acpi, intel_acpi_match);
-
-static int intel_acpi_probe(struct intel_device *idev)
-{
-	const struct acpi_device_id *id;
-
-	id = acpi_match_device(intel_acpi_match, &idev->pdev->dev);
-	if (!id)
-		return -ENODEV;
-
-	return 0;
-}
-#else
-static int intel_acpi_probe(struct intel_device *idev)
-{
-	return -ENODEV;
-}
 #endif
 
 #ifdef CONFIG_PM
@@ -1247,14 +1233,6 @@ static int intel_probe(struct platform_device *pdev)
 	mutex_init(&idev->hu_lock);
 
 	idev->pdev = pdev;
-
-	if (ACPI_HANDLE(&pdev->dev)) {
-		int err = intel_acpi_probe(idev);
-		if (err)
-			return err;
-	} else {
-		return -ENODEV;
-	}
 
 	idev->reset = devm_gpiod_get_optional(&pdev->dev, "reset",
 					      GPIOD_OUT_LOW);

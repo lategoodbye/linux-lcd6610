@@ -89,7 +89,6 @@ ksocknal_alloc_tx_noop(__u64 cookie, int nonblk)
 	return tx;
 }
 
-
 void
 ksocknal_free_tx (ksock_tx_t *tx)
 {
@@ -299,6 +298,7 @@ ksocknal_recv_kiov (ksock_conn_t *conn)
 	lnet_kiov_t *kiov = conn->ksnc_rx_kiov;
 	int nob;
 	int rc;
+
 	LASSERT(conn->ksnc_rx_nkiov > 0);
 
 	/* Never touch conn->ksnc_rx_kiov or change connection
@@ -771,7 +771,6 @@ ksocknal_queue_tx_locked (ksock_tx_t *tx, ksock_conn_t *conn)
 
 	spin_unlock_bh(&sched->kss_lock);
 }
-
 
 ksock_route_t *
 ksocknal_find_connectable_route_locked (ksock_peer_t *peer)
@@ -1998,7 +1997,7 @@ ksocknal_connect (ksock_route_t *route)
  * running out of resource.
  */
 static int
-ksocknal_connd_check_start(long sec, long *timeout)
+ksocknal_connd_check_start(time64_t sec, long *timeout)
 {
 	char name[16];
 	int rc;
@@ -2048,7 +2047,7 @@ ksocknal_connd_check_start(long sec, long *timeout)
 	/* we tried ... */
 	LASSERT(ksocknal_data.ksnd_connd_starting > 0);
 	ksocknal_data.ksnd_connd_starting--;
-	ksocknal_data.ksnd_connd_failed_stamp = get_seconds();
+	ksocknal_data.ksnd_connd_failed_stamp = ktime_get_real_seconds();
 
 	return 1;
 }
@@ -2060,7 +2059,7 @@ ksocknal_connd_check_start(long sec, long *timeout)
  * again to recheck these conditions.
  */
 static int
-ksocknal_connd_check_stop(long sec, long *timeout)
+ksocknal_connd_check_stop(time64_t sec, long *timeout)
 {
 	int val;
 
@@ -2141,7 +2140,7 @@ ksocknal_connd (void *arg)
 
 	while (!ksocknal_data.ksnd_shuttingdown) {
 		ksock_route_t *route = NULL;
-		long sec = get_seconds();
+		time64_t sec = ktime_get_real_seconds();
 		long timeout = MAX_SCHEDULE_TIMEOUT;
 		int dropped_lock = 0;
 
@@ -2240,6 +2239,7 @@ ksocknal_find_timed_out_conn (ksock_peer_t *peer)
 
 	list_for_each (ctmp, &peer->ksnp_conns) {
 		int error;
+
 		conn = list_entry (ctmp, ksock_conn_t, ksnc_list);
 
 		/* Don't need the {get,put}connsock dance to deref ksnc_sock */
@@ -2393,7 +2393,6 @@ ksocknal_send_keepalive_locked(ksock_peer_t *peer)
 
 	return -EIO;
 }
-
 
 static void
 ksocknal_check_peer_timeouts (int idx)

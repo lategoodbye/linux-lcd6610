@@ -39,7 +39,6 @@
  * Author: Phil Schwan <phil@clusterfs.com>
  */
 
-
 #define DEBUG_SUBSYSTEM S_LNET
 #define LUSTRE_TRACEFILE_PRIVATE
 #include "tracefile.h"
@@ -652,6 +651,7 @@ void cfs_trace_debug_print(void)
 		while (p < ((char *)page_address(page) + tage->used)) {
 			struct ptldebug_header *hdr;
 			int len;
+
 			hdr = (void *)p;
 			p += sizeof(*hdr);
 			file = p;
@@ -810,7 +810,7 @@ int cfs_trace_allocate_string_buffer(char **str, int nob)
 	if (nob > 2 * PAGE_CACHE_SIZE)	    /* string must be "sensible" */
 		return -EINVAL;
 
-	*str = kmalloc(nob, GFP_IOFS | __GFP_ZERO);
+	*str = kmalloc(nob, GFP_KERNEL | __GFP_ZERO);
 	if (*str == NULL)
 		return -ENOMEM;
 

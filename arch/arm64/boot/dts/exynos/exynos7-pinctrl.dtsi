@@ -588,14 +588,6 @@
 };
 
 &pinctrl_bus1 {
-	etc1: etc1 {
-		gpio-controller;
-		#gpio-cells = <2>;
-
-		interrupt-controller;
-		#interrupt-cells = <2>;
-	};
-
 	gpf0: gpf0 {
 		gpio-controller;
 		#gpio-cells = <2>;

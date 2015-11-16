@@ -84,6 +84,10 @@ static inline void update_cpu_load_active(struct rq *this_rq) { }
  */
 #define RUNTIME_INF	((u64)~0ULL)
 
+static inline int idle_policy(int policy)
+{
+	return policy == SCHED_IDLE;
+}
 static inline int fair_policy(int policy)
 {
 	return policy == SCHED_NORMAL || policy == SCHED_BATCH;
@@ -98,6 +102,11 @@ static inline int dl_policy(int policy)
 {
 	return policy == SCHED_DEADLINE;
 }
+static inline bool valid_policy(int policy)
+{
+	return idle_policy(policy) || fair_policy(policy) ||
+		rt_policy(policy) || dl_policy(policy);
+}
 
 static inline int task_has_rt_policy(struct task_struct *p)
 {
@@ -107,11 +116,6 @@ static inline int task_has_rt_policy(struct task_struct *p)
 static inline int task_has_dl_policy(struct task_struct *p)
 {
 	return dl_policy(p->policy);
-}
-
-static inline bool dl_time_before(u64 a, u64 b)
-{
-	return (s64)(a - b) < 0;
 }
 
 /*
@@ -1068,9 +1072,10 @@ static inline void finish_lock_switch(struct rq *rq, struct task_struct *prev)
 	 * After ->on_cpu is cleared, the task can be moved to a different CPU.
 	 * We must ensure this doesn't happen until the switch is completely
 	 * finished.
+	 *
+	 * Pairs with the control dependency and rmb in try_to_wake_up().
 	 */
-	smp_wmb();
-	prev->on_cpu = 0;
+	smp_store_release(&prev->on_cpu, 0);
 #endif
 #ifdef CONFIG_DEBUG_SPINLOCK
 	/* this is a valid case when another task releases the spinlock */
@@ -1146,16 +1151,18 @@ static const u32 prio_to_wmult[40] = {
  /*  15 */ 119304647, 148102320, 186737708, 238609294, 286331153,
 };
 
-#define ENQUEUE_WAKEUP		1
-#define ENQUEUE_HEAD		2
+#define ENQUEUE_WAKEUP		0x01
+#define ENQUEUE_HEAD		0x02
 #ifdef CONFIG_SMP
-#define ENQUEUE_WAKING		4	/* sched_class::task_waking was called */
+#define ENQUEUE_WAKING		0x04	/* sched_class::task_waking was called */
 #else
-#define ENQUEUE_WAKING		0
+#define ENQUEUE_WAKING		0x00
 #endif
-#define ENQUEUE_REPLENISH	8
+#define ENQUEUE_REPLENISH	0x08
+#define ENQUEUE_RESTORE	0x10
 
-#define DEQUEUE_SLEEP		1
+#define DEQUEUE_SLEEP		0x01
+#define DEQUEUE_SAVE		0x02
 
 #define RETRY_TASK		((void *)-1UL)
 
@@ -1183,7 +1190,7 @@ struct sched_class {
 
 #ifdef CONFIG_SMP
 	int  (*select_task_rq)(struct task_struct *p, int task_cpu, int sd_flag, int flags);
-	void (*migrate_task_rq)(struct task_struct *p, int next_cpu);
+	void (*migrate_task_rq)(struct task_struct *p);
 
 	void (*task_waking) (struct task_struct *task);
 	void (*task_woken) (struct rq *this_rq, struct task_struct *task);

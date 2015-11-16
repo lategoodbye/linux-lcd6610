@@ -1470,7 +1470,6 @@ extern spinlock_t ubifs_infos_lock;
 extern atomic_long_t ubifs_clean_zn_cnt;
 extern struct kmem_cache *ubifs_inode_slab;
 extern const struct super_operations ubifs_super_operations;
-extern const struct xattr_handler *ubifs_xattr_handlers[];
 extern const struct address_space_operations ubifs_file_address_operations;
 extern const struct file_operations ubifs_file_operations;
 extern const struct inode_operations ubifs_file_inode_operations;
@@ -1746,6 +1745,9 @@ int ubifs_calc_dark(const struct ubifs_info *c, int spc);
 /* file.c */
 int ubifs_fsync(struct file *file, loff_t start, loff_t end, int datasync);
 int ubifs_setattr(struct dentry *dentry, struct iattr *attr);
+#ifdef CONFIG_UBIFS_ATIME_SUPPORT
+int ubifs_update_time(struct inode *inode, struct timespec *time, int flags);
+#endif
 
 /* dir.c */
 struct inode *ubifs_new_inode(struct ubifs_info *c, const struct inode *dir,

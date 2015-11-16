@@ -198,7 +198,7 @@ static unsigned long align_sigframe(unsigned long sp)
 	return sp;
 }
 
-static inline void __user *
+static void __user *
 get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, size_t frame_size,
 	     void __user **fpstate)
 {
@@ -301,7 +301,7 @@ __setup_frame(int sig, struct ksignal *ksig, sigset_t *set,
 
 	if (current->mm->context.vdso)
 		restorer = current->mm->context.vdso +
-			selected_vdso32->sym___kernel_sigreturn;
+			vdso_image_32.sym___kernel_sigreturn;
 	else
 		restorer = &frame->retcode;
 	if (ksig->ka.sa.sa_flags & SA_RESTORER)
@@ -365,7 +365,7 @@ static int __setup_rt_frame(int sig, struct ksignal *ksig,
 
 		/* Set up to return from userspace.  */
 		restorer = current->mm->context.vdso +
-			selected_vdso32->sym___kernel_rt_sigreturn;
+			vdso_image_32.sym___kernel_rt_sigreturn;
 		if (ksig->ka.sa.sa_flags & SA_RESTORER)
 			restorer = ksig->ka.sa.sa_restorer;
 		put_user_ex(restorer, &frame->pretcode);

@@ -71,8 +71,6 @@
 
 static int init_display(struct fbtft_par *par)
 {
-	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
-
 	par->fbtftops.reset(par);
 
 	/* softreset of LCD */
@@ -143,12 +141,10 @@ static void set_addr_win(struct fbtft_par *par, int xs, int ys, int xe, int ye)
 
 static int write_vmem(struct fbtft_par *par, size_t offset, size_t len)
 {
-	u16 *vmem16 = (u16 *)par->info->screen_base;
+	u16 *vmem16 = (u16 *)par->info->screen_buffer;
 	u8 *buf = par->txbuf.buf;
 	int x, y, i;
 	int ret = 0;
-
-	fbtft_par_dbg(DEBUG_WRITE_VMEM, par, "%s()\n", __func__);
 
 	for (y = 0; y < PAGES; y++) {
 		buf = par->txbuf.buf;

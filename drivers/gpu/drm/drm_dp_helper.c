@@ -424,6 +424,19 @@ static u32 drm_dp_i2c_functionality(struct i2c_adapter *adapter)
 	       I2C_FUNC_10BIT_ADDR;
 }
 
+static void drm_dp_i2c_msg_write_status_update(struct drm_dp_aux_msg *msg)
+{
+	/*
+	 * In case of i2c defer or short i2c ack reply to a write,
+	 * we need to switch to WRITE_STATUS_UPDATE to drain the
+	 * rest of the message
+	 */
+	if ((msg->request & ~DP_AUX_I2C_MOT) == DP_AUX_I2C_WRITE) {
+		msg->request &= DP_AUX_I2C_MOT;
+		msg->request |= DP_AUX_I2C_WRITE_STATUS_UPDATE;
+	}
+}
+
 #define AUX_PRECHARGE_LEN 10 /* 10 to 16 */
 #define AUX_SYNC_LEN (16 + 4) /* preamble + AUX_SYNC_END */
 #define AUX_STOP_LEN 4
@@ -507,19 +520,6 @@ static int dp_aux_i2c_speed_khz __read_mostly = 10;
 module_param_unsafe(dp_aux_i2c_speed_khz, int, 0644);
 MODULE_PARM_DESC(dp_aux_i2c_speed_khz,
 		 "Assumed speed of the i2c bus in kHz, (1-400, default 10)");
-
-static void drm_dp_i2c_msg_write_status_update(struct drm_dp_aux_msg *msg)
-{
-	/*
-	 * In case of i2c defer or short i2c ack reply to a write,
-	 * we need to switch to WRITE_STATUS_UPDATE to drain the
-	 * rest of the message
-	 */
-	if ((msg->request & ~DP_AUX_I2C_MOT) == DP_AUX_I2C_WRITE) {
-		msg->request &= DP_AUX_I2C_MOT;
-		msg->request |= DP_AUX_I2C_WRITE_STATUS_UPDATE;
-	}
-}
 
 /*
  * Transfer a single I2C-over-AUX message and handle various error conditions,
@@ -612,6 +612,7 @@ static int drm_dp_i2c_do_msg(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
 				defer_i2c++;
 			usleep_range(AUX_RETRY_INTERVAL, AUX_RETRY_INTERVAL + 100);
 			drm_dp_i2c_msg_write_status_update(msg);
+
 			continue;
 
 		default:

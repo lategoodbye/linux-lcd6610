@@ -38,6 +38,8 @@
 #include <drm/drm_crtc.h>
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_atomic.h>
+#include <drm/drm_atomic_helper.h>
 
 static bool drm_fbdev_emulation = true;
 module_param_named(fbdev_emulation, drm_fbdev_emulation, bool, 0600);
@@ -334,6 +336,81 @@ int drm_fb_helper_debug_leave(struct fb_info *info)
 }
 EXPORT_SYMBOL(drm_fb_helper_debug_leave);
 
+static int restore_fbdev_mode_atomic(struct drm_fb_helper *fb_helper)
+{
+	struct drm_device *dev = fb_helper->dev;
+	struct drm_plane *plane;
+	struct drm_atomic_state *state;
+	int i, ret;
+
+	state = drm_atomic_state_alloc(dev);
+	if (!state)
+		return -ENOMEM;
+
+	state->acquire_ctx = dev->mode_config.acquire_ctx;
+retry:
+	drm_for_each_plane(plane, dev) {
+		struct drm_plane_state *plane_state;
+
+		plane->old_fb = plane->fb;
+
+		plane_state = drm_atomic_get_plane_state(state, plane);
+		if (IS_ERR(plane_state)) {
+			ret = PTR_ERR(plane_state);
+			goto fail;
+		}
+
+		plane_state->rotation = BIT(DRM_ROTATE_0);
+
+		/* disable non-primary: */
+		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
+			continue;
+
+		ret = __drm_atomic_helper_disable_plane(plane, plane_state);
+		if (ret != 0)
+			goto fail;
+	}
+
+	for(i = 0; i < fb_helper->crtc_count; i++) {
+		struct drm_mode_set *mode_set = &fb_helper->crtc_info[i].mode_set;
+
+		ret = __drm_atomic_helper_set_config(mode_set, state);
+		if (ret != 0)
+			goto fail;
+	}
+
+	ret = drm_atomic_commit(state);
+
+fail:
+	drm_for_each_plane(plane, dev) {
+		if (ret == 0) {
+			struct drm_framebuffer *new_fb = plane->state->fb;
+			if (new_fb)
+				drm_framebuffer_reference(new_fb);
+			plane->fb = new_fb;
+			plane->crtc = plane->state->crtc;
+
+			if (plane->old_fb)
+				drm_framebuffer_unreference(plane->old_fb);
+		}
+		plane->old_fb = NULL;
+	}
+
+	if (ret == -EDEADLK)
+		goto backoff;
+
+	if (ret != 0)
+		drm_atomic_state_free(state);
+
+	return ret;
+
+backoff:
+	drm_atomic_state_clear(state);
+	drm_atomic_legacy_backoff(state);
+
+	goto retry;
+}
+
 static int restore_fbdev_mode(struct drm_fb_helper *fb_helper)
 {
 	struct drm_device *dev = fb_helper->dev;
@@ -341,6 +418,9 @@ static int restore_fbdev_mode(struct drm_fb_helper *fb_helper)
 	int i;
 
 	drm_warn_on_modeset_not_all_locked(dev);
+
+	if (fb_helper->atomic)
+		return restore_fbdev_mode_atomic(fb_helper);
 
 	drm_for_each_plane(plane, dev) {
 		if (plane->type != DRM_PLANE_TYPE_PRIMARY)
@@ -358,7 +438,11 @@ static int restore_fbdev_mode(struct drm_fb_helper *fb_helper)
 		struct drm_crtc *crtc = mode_set->crtc;
 		int ret;
 
-		if (crtc->funcs->cursor_set) {
+		if (crtc->funcs->cursor_set2) {
+			ret = crtc->funcs->cursor_set2(crtc, NULL, 0, 0, 0, 0, 0);
+			if (ret)
+				return ret;
+		} else if (crtc->funcs->cursor_set) {
 			ret = crtc->funcs->cursor_set(crtc, NULL, 0, 0, 0);
 			if (ret)
 				return ret;
@@ -643,6 +727,8 @@ int drm_fb_helper_init(struct drm_device *dev,
 		fb_helper->crtc_info[i].mode_set.crtc = crtc;
 		i++;
 	}
+
+	fb_helper->atomic = !!drm_core_check_feature(dev, DRIVER_ATOMIC);
 
 	return 0;
 out_free:
@@ -1144,6 +1230,80 @@ int drm_fb_helper_set_par(struct fb_info *info)
 }
 EXPORT_SYMBOL(drm_fb_helper_set_par);
 
+static int pan_display_atomic(struct fb_var_screeninfo *var,
+			      struct fb_info *info)
+{
+	struct drm_fb_helper *fb_helper = info->par;
+	struct drm_device *dev = fb_helper->dev;
+	struct drm_atomic_state *state;
+	int i, ret;
+
+	state = drm_atomic_state_alloc(dev);
+	if (!state)
+		return -ENOMEM;
+
+	state->acquire_ctx = dev->mode_config.acquire_ctx;
+retry:
+	for(i = 0; i < fb_helper->crtc_count; i++) {
+		struct drm_mode_set *mode_set;
+
+		mode_set = &fb_helper->crtc_info[i].mode_set;
+
+		mode_set->crtc->primary->old_fb = mode_set->crtc->primary->fb;
+
+		mode_set->x = var->xoffset;
+		mode_set->y = var->yoffset;
+
+		ret = __drm_atomic_helper_set_config(mode_set, state);
+		if (ret != 0)
+			goto fail;
+	}
+
+	ret = drm_atomic_commit(state);
+	if (ret != 0)
+		goto fail;
+
+	info->var.xoffset = var->xoffset;
+	info->var.yoffset = var->yoffset;
+
+
+fail:
+	for(i = 0; i < fb_helper->crtc_count; i++) {
+		struct drm_mode_set *mode_set;
+		struct drm_plane *plane;
+
+		mode_set = &fb_helper->crtc_info[i].mode_set;
+		plane = mode_set->crtc->primary;
+
+		if (ret == 0) {
+			struct drm_framebuffer *new_fb = plane->state->fb;
+
+			if (new_fb)
+				drm_framebuffer_reference(new_fb);
+			plane->fb = new_fb;
+			plane->crtc = plane->state->crtc;
+
+			if (plane->old_fb)
+				drm_framebuffer_unreference(plane->old_fb);
+		}
+		plane->old_fb = NULL;
+	}
+
+	if (ret == -EDEADLK)
+		goto backoff;
+
+	if (ret != 0)
+		drm_atomic_state_free(state);
+
+	return ret;
+
+backoff:
+	drm_atomic_state_clear(state);
+	drm_atomic_legacy_backoff(state);
+
+	goto retry;
+}
+
 /**
  * drm_fb_helper_pan_display - implementation for ->fb_pan_display
  * @var: updated screen information
@@ -1167,6 +1327,11 @@ int drm_fb_helper_pan_display(struct fb_var_screeninfo *var,
 		return -EBUSY;
 	}
 
+	if (fb_helper->atomic) {
+		ret = pan_display_atomic(var, info);
+		goto unlock;
+	}
+
 	for (i = 0; i < fb_helper->crtc_count; i++) {
 		modeset = &fb_helper->crtc_info[i].mode_set;
 
@@ -1181,6 +1346,7 @@ int drm_fb_helper_pan_display(struct fb_var_screeninfo *var,
 			}
 		}
 	}
+unlock:
 	drm_modeset_unlock_all(dev);
 	return ret;
 }

@@ -51,6 +51,7 @@ static inline void lov_sub_enter(struct lov_io_sub *sub)
 {
 	sub->sub_reenter++;
 }
+
 static inline void lov_sub_exit(struct lov_io_sub *sub)
 {
 	sub->sub_reenter--;
@@ -90,7 +91,6 @@ static void lov_io_sub_inherit(struct cl_io *io, struct lov_io *lio,
 	case CIT_SETATTR: {
 		io->u.ci_setattr.sa_attr = parent->u.ci_setattr.sa_attr;
 		io->u.ci_setattr.sa_valid = parent->u.ci_setattr.sa_valid;
-		io->u.ci_setattr.sa_capa = parent->u.ci_setattr.sa_capa;
 		if (cl_io_is_trunc(io)) {
 			loff_t new_size = parent->u.ci_setattr.sa_attr.lvb_size;
 
@@ -111,7 +111,6 @@ static void lov_io_sub_inherit(struct cl_io *io, struct lov_io *lio,
 	case CIT_FSYNC: {
 		io->u.ci_fsync.fi_start = start;
 		io->u.ci_fsync.fi_end = end;
-		io->u.ci_fsync.fi_capa = parent->u.ci_fsync.fi_capa;
 		io->u.ci_fsync.fi_fid = parent->u.ci_fsync.fi_fid;
 		io->u.ci_fsync.fi_mode = parent->u.ci_fsync.fi_mode;
 		break;
@@ -273,7 +272,6 @@ struct lov_io_sub *lov_page_subio(const struct lu_env *env, struct lov_io *lio,
 	return lov_sub_get(env, lio, stripe);
 }
 
-
 static int lov_io_subio_init(const struct lu_env *env, struct lov_io *lio,
 			     struct cl_io *io)
 {
@@ -332,6 +330,7 @@ static void lov_io_slice_init(struct lov_io *lio,
 
 	case CIT_FAULT: {
 		pgoff_t index = io->u.ci_fault.ft_index;
+
 		lio->lis_pos = cl_offset(io->ci_obj, index);
 		lio->lis_endpos = cl_offset(io->ci_obj, index + 1);
 		break;
@@ -545,7 +544,6 @@ static void lov_io_unlock(const struct lu_env *env,
 	rc = lov_io_call(env, cl2lov_io(env, ios), lov_io_unlock_wrapper);
 	LASSERT(rc == 0);
 }
-
 
 static struct cl_page_list *lov_io_submit_qin(struct lov_device *ld,
 					      struct cl_page_list *qin,
@@ -992,4 +990,5 @@ int lov_io_init_released(const struct lu_env *env, struct cl_object *obj,
 	io->ci_result = result < 0 ? result : 0;
 	return result != 0;
 }
+
 /** @} lov */

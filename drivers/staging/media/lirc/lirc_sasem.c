@@ -42,7 +42,6 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/usb.h>
-#include <linux/ktime.h>
 
 #include <media/lirc.h>
 #include <media/lirc_dev.h>
@@ -112,7 +111,7 @@ struct sasem_context {
 	} tx;
 
 	/* for dealing with repeat codes (wish there was a toggle bit!) */
-	ktime_t presstime;
+	struct timeval presstime;
 	char lastcode[8];
 	int codesaved;
 };
@@ -182,7 +181,7 @@ static void deregister_from_lirc(struct sasem_context *context)
 	if (retval)
 		dev_err(&context->dev->dev,
 			"%s: unable to deregister from lirc (%d)\n",
-		       __func__, retval);
+			__func__, retval);
 	else
 		dev_info(&context->dev->dev,
 			 "Deregistered Sasem driver (minor:%d)\n", minor);
@@ -245,7 +244,7 @@ exit:
  */
 static long vfd_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 {
-	struct sasem_context *context = NULL;
+	struct sasem_context *context;
 
 	context = (struct sasem_context *) file->private_data;
 
@@ -567,8 +566,8 @@ static void incoming_packet(struct sasem_context *context,
 {
 	int len = urb->actual_length;
 	unsigned char *buf = urb->transfer_buffer;
-	u64 ns;
-	ktime_t kt;
+	long ms;
+	struct timeval tv;
 
 	if (len != 8) {
 		dev_warn(&context->dev->dev,
@@ -585,8 +584,9 @@ static void incoming_packet(struct sasem_context *context,
 	 */
 
 	/* get the time since the last button press */
-	kt = ktime_get();
-	ns = ktime_to_ns(ktime_sub(kt, context->presstime));
+	do_gettimeofday(&tv);
+	ms = (tv.tv_sec - context->presstime.tv_sec) * 1000 +
+	     (tv.tv_usec - context->presstime.tv_usec) / 1000;
 
 	if (memcmp(buf, "\x08\0\0\0\0\0\0\0", 8) == 0) {
 		/*
@@ -600,9 +600,10 @@ static void incoming_packet(struct sasem_context *context,
 		 *   in that time and then get a false repeat of the previous
 		 *   press but it is long enough for a genuine repeat
 		 */
-		if ((ns < 250 * NSEC_PER_MSEC) && (context->codesaved != 0)) {
+		if ((ms < 250) && (context->codesaved != 0)) {
 			memcpy(buf, &context->lastcode, 8);
-			context->presstime = kt;
+			context->presstime.tv_sec = tv.tv_sec;
+			context->presstime.tv_usec = tv.tv_usec;
 		}
 	} else {
 		/* save the current valid code for repeats */
@@ -612,7 +613,8 @@ static void incoming_packet(struct sasem_context *context,
 		 * just for safety reasons
 		 */
 		context->codesaved = 1;
-		context->presstime = kt;
+		context->presstime.tv_sec = tv.tv_sec;
+		context->presstime.tv_usec = tv.tv_usec;
 	}
 
 	lirc_buffer_write(context->driver->rbuf, buf);
@@ -695,16 +697,11 @@ static int sasem_probe(struct usb_interface *interface,
 	for (i = 0; i < num_endpoints && !(ir_ep_found && vfd_ep_found); ++i) {
 
 		struct usb_endpoint_descriptor *ep;
-		int ep_dir;
-		int ep_type;
 
 		ep = &iface_desc->endpoint [i].desc;
-		ep_dir = ep->bEndpointAddress & USB_ENDPOINT_DIR_MASK;
-		ep_type = ep->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK;
 
 		if (!ir_ep_found &&
-			ep_dir == USB_DIR_IN &&
-			ep_type == USB_ENDPOINT_XFER_INT) {
+			usb_endpoint_is_int_in(ep)) {
 
 			rx_endpoint = ep;
 			ir_ep_found = 1;
@@ -713,8 +710,7 @@ static int sasem_probe(struct usb_interface *interface,
 					"%s: found IR endpoint\n", __func__);
 
 		} else if (!vfd_ep_found &&
-			ep_dir == USB_DIR_OUT &&
-			ep_type == USB_ENDPOINT_XFER_INT) {
+			usb_endpoint_is_int_out(ep)) {
 
 			tx_endpoint = ep;
 			vfd_ep_found = 1;

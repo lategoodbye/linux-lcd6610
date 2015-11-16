@@ -68,13 +68,11 @@ static void write_reg8_bus8(struct fbtft_par *par, int len, ...)
 static int write_vmem(struct fbtft_par *par, size_t offset, size_t len)
 {
 	unsigned start_line, end_line;
-	u16 *vmem16 = (u16 *)(par->info->screen_base + offset);
+	u16 *vmem16 = (u16 *)(par->info->screen_buffer + offset);
 	u16 *pos = par->txbuf.buf + 1;
 	u16 *buf16 = par->txbuf.buf + 10;
 	int i, j;
 	int ret = 0;
-
-	fbtft_par_dbg(DEBUG_WRITE_VMEM, par, "%s()\n", __func__);
 
 	start_line = offset / par->info->fix.line_length;
 	end_line = start_line + (len / par->info->fix.line_length) - 1;
@@ -107,13 +105,11 @@ static int write_vmem(struct fbtft_par *par, size_t offset, size_t len)
 static int write_vmem_8bit(struct fbtft_par *par, size_t offset, size_t len)
 {
 	unsigned start_line, end_line;
-	u16 *vmem16 = (u16 *)(par->info->screen_base + offset);
+	u16 *vmem16 = (u16 *)(par->info->screen_buffer + offset);
 	u16 *pos = par->txbuf.buf + 1;
 	u8 *buf8 = par->txbuf.buf + 10;
 	int i, j;
 	int ret = 0;
-
-	fbtft_par_dbg(DEBUG_WRITE_VMEM, par, "%s()\n", __func__);
 
 	start_line = offset / par->info->fix.line_length;
 	end_line = start_line + (len / par->info->fix.line_length) - 1;
@@ -159,8 +155,6 @@ static int init_display(struct fbtft_par *par)
 	unsigned version;
 	u8 save_mode;
 
-	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
-
 	/* enable SPI interface by having CS and MOSI low during reset */
 	save_mode = par->spi->mode;
 	par->spi->mode |= SPI_CS_HIGH;
@@ -199,8 +193,6 @@ static void set_addr_win(struct fbtft_par *par, int xs, int ys, int xe, int ye)
 static int set_var(struct fbtft_par *par)
 {
 	u8 rotate;
-
-	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
 
 	/* this controller rotates clock wise */
 	switch (par->info->var.rotate) {
@@ -260,8 +252,6 @@ static void register_chip_backlight(struct fbtft_par *par)
 {
 	struct backlight_device *bd;
 	struct backlight_properties bl_props = { 0, };
-
-	fbtft_par_dbg(DEBUG_BACKLIGHT, par, "%s()\n", __func__);
 
 	bl_props.type = BACKLIGHT_RAW;
 	bl_props.power = FB_BLANK_POWERDOWN;

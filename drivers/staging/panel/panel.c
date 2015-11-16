@@ -71,7 +71,7 @@
 #define KEYPAD_BUFFER		64
 
 /* poll the keyboard this every second */
-#define INPUT_POLL_TIME		(HZ/50)
+#define INPUT_POLL_TIME		(HZ / 50)
 /* a key starts to repeat after this times INPUT_POLL_TIME */
 #define KEYPAD_REP_START	(10)
 /* a key repeats this times INPUT_POLL_TIME */
@@ -576,7 +576,6 @@ static int keypad_enabled = NOT_SET;
 module_param(keypad_enabled, int, 0000);
 MODULE_PARM_DESC(keypad_enabled, "Deprecated option, use keypad_type instead");
 
-
 static const unsigned char *lcd_char_conv;
 
 /* for some LCD drivers (ks0074) we need a charset conversion table. */
@@ -826,7 +825,8 @@ static void lcd_write_cmd_s(int cmd)
 	lcd_send_serial(0x1F);	/* R/W=W, RS=0 */
 	lcd_send_serial(cmd & 0x0F);
 	lcd_send_serial((cmd >> 4) & 0x0F);
-	udelay(40);		/* the shortest command takes at least 40 us */
+	/* the shortest command takes at least 40 us */
+	usleep_range(40, 100);
 	spin_unlock_irq(&pprt_lock);
 }
 
@@ -837,7 +837,8 @@ static void lcd_write_data_s(int data)
 	lcd_send_serial(0x5F);	/* R/W=W, RS=1 */
 	lcd_send_serial(data & 0x0F);
 	lcd_send_serial((data >> 4) & 0x0F);
-	udelay(40);		/* the shortest data takes at least 40 us */
+	/* the shortest data takes at least 40 us */
+	usleep_range(40, 100);
 	spin_unlock_irq(&pprt_lock);
 }
 
@@ -847,19 +848,20 @@ static void lcd_write_cmd_p8(int cmd)
 	spin_lock_irq(&pprt_lock);
 	/* present the data to the data port */
 	w_dtr(pprt, cmd);
-	udelay(20);	/* maintain the data during 20 us before the strobe */
+	/* maintain the data during 20 us before the strobe */
+	usleep_range(20, 100);
 
 	bits.e = BIT_SET;
 	bits.rs = BIT_CLR;
 	bits.rw = BIT_CLR;
 	set_ctrl_bits();
 
-	udelay(40);	/* maintain the strobe during 40 us */
+	usleep_range(40, 100);	/* maintain the strobe during 40 us */
 
 	bits.e = BIT_CLR;
 	set_ctrl_bits();
 
-	udelay(120);	/* the shortest command takes at least 120 us */
+	usleep_range(120, 500);	/* the shortest command takes at least 120 us */
 	spin_unlock_irq(&pprt_lock);
 }
 
@@ -869,19 +871,20 @@ static void lcd_write_data_p8(int data)
 	spin_lock_irq(&pprt_lock);
 	/* present the data to the data port */
 	w_dtr(pprt, data);
-	udelay(20);	/* maintain the data during 20 us before the strobe */
+	/* maintain the data during 20 us before the strobe */
+	usleep_range(20, 100);
 
 	bits.e = BIT_SET;
 	bits.rs = BIT_SET;
 	bits.rw = BIT_CLR;
 	set_ctrl_bits();
 
-	udelay(40);	/* maintain the strobe during 40 us */
+	usleep_range(40, 100);	/* maintain the strobe during 40 us */
 
 	bits.e = BIT_CLR;
 	set_ctrl_bits();
 
-	udelay(45);	/* the shortest data takes at least 45 us */
+	usleep_range(45, 100);	/* the shortest data takes at least 45 us */
 	spin_unlock_irq(&pprt_lock);
 }
 
@@ -891,7 +894,7 @@ static void lcd_write_cmd_tilcd(int cmd)
 	spin_lock_irq(&pprt_lock);
 	/* present the data to the control port */
 	w_ctr(pprt, cmd);
-	udelay(60);
+	usleep_range(60, 120);
 	spin_unlock_irq(&pprt_lock);
 }
 
@@ -901,7 +904,7 @@ static void lcd_write_data_tilcd(int data)
 	spin_lock_irq(&pprt_lock);
 	/* present the data to the data port */
 	w_dtr(pprt, data);
-	udelay(60);
+	usleep_range(60, 120);
 	spin_unlock_irq(&pprt_lock);
 }
 
@@ -920,7 +923,7 @@ static void lcd_gotoxy(void)
 static void lcd_print(char c)
 {
 	if (lcd.addr.x < lcd.bwidth) {
-		if (lcd_char_conv != NULL)
+		if (lcd_char_conv)
 			c = lcd_char_conv[(unsigned char)c];
 		lcd_write_data(c);
 		lcd.addr.x++;
@@ -944,7 +947,7 @@ static void lcd_clear_fast_s(void)
 		lcd_send_serial(0x5F);	/* R/W=W, RS=1 */
 		lcd_send_serial(' ' & 0x0F);
 		lcd_send_serial((' ' >> 4) & 0x0F);
-		udelay(40);	/* the shortest data takes at least 40 us */
+		usleep_range(40, 100);	/* the shortest data takes at least 40 us */
 	}
 	spin_unlock_irq(&pprt_lock);
 
@@ -968,7 +971,7 @@ static void lcd_clear_fast_p8(void)
 		w_dtr(pprt, ' ');
 
 		/* maintain the data during 20 us before the strobe */
-		udelay(20);
+		usleep_range(20, 100);
 
 		bits.e = BIT_SET;
 		bits.rs = BIT_SET;
@@ -976,13 +979,13 @@ static void lcd_clear_fast_p8(void)
 		set_ctrl_bits();
 
 		/* maintain the strobe during 40 us */
-		udelay(40);
+		usleep_range(40, 100);
 
 		bits.e = BIT_CLR;
 		set_ctrl_bits();
 
 		/* the shortest data takes at least 45 us */
-		udelay(45);
+		usleep_range(45, 100);
 	}
 	spin_unlock_irq(&pprt_lock);
 
@@ -1004,7 +1007,7 @@ static void lcd_clear_fast_tilcd(void)
 	for (pos = 0; pos < lcd.height * lcd.hwidth; pos++) {
 		/* present the data to the data port */
 		w_dtr(pprt, ' ');
-		udelay(60);
+		usleep_range(60, 120);
 	}
 
 	spin_unlock_irq(&pprt_lock);
@@ -1118,9 +1121,9 @@ static inline int handle_lcd_special_code(void)
 		break;
 	case '*':
 		/* flash back light using the keypad timer */
-		if (scan_timer.function != NULL) {
-			if (lcd.light_tempo == 0
-					&& ((lcd.flags & LCD_FLAG_L) == 0))
+		if (scan_timer.function) {
+			if (lcd.light_tempo == 0 &&
+			    ((lcd.flags & LCD_FLAG_L) == 0))
 				lcd_backlight(1);
 			lcd.light_tempo = FLASH_LIGHT_TEMPO;
 		}
@@ -1200,7 +1203,7 @@ static inline int handle_lcd_special_code(void)
 		char value;
 		int addr;
 
-		if (strchr(esc, ';') == NULL)
+		if (!strchr(esc, ';'))
 			break;
 
 		esc++;
@@ -1246,7 +1249,7 @@ static inline int handle_lcd_special_code(void)
 	}
 	case 'x':	/* gotoxy : LxXXX[yYYY]; */
 	case 'y':	/* gotoxy : LyYYY[xXXX]; */
-		if (strchr(esc, ';') == NULL)
+		if (!strchr(esc, ';'))
 			break;
 
 		while (*esc) {
@@ -1794,7 +1797,7 @@ static void phys_scan_contacts(void)
 		 * So we'll scan them.
 		 */
 		for (bit = 0; bit < 8; bit++) {
-			bitval = 1 << bit;
+			bitval = BIT(bit);
 
 			if (!(scan_mask_o & bitval))	/* skip unused bits */
 				continue;
@@ -1844,7 +1847,7 @@ static inline int input_state_high(struct logical_input *input)
 		if ((input->type == INPUT_TYPE_STD) &&
 		    (input->high_timer == 0)) {
 			input->high_timer++;
-			if (input->u.std.press_fct != NULL)
+			if (input->u.std.press_fct)
 				input->u.std.press_fct(input->u.std.press_data);
 		} else if (input->type == INPUT_TYPE_KBD) {
 			/* will turn on the light */
@@ -1924,7 +1927,7 @@ static inline void input_state_falling(struct logical_input *input)
 		if (input->type == INPUT_TYPE_STD) {
 			void (*release_fct)(int) = input->u.std.release_fct;
 
-			if (release_fct != NULL)
+			if (release_fct)
 				release_fct(input->u.std.release_data);
 		} else if (input->type == INPUT_TYPE_KBD) {
 			char *release_str = input->u.kbd.release_str;
@@ -2008,14 +2011,14 @@ static void panel_scan_timer(void)
 
 	if (lcd.enabled && lcd.initialized) {
 		if (keypressed) {
-			if (lcd.light_tempo == 0
-					&& ((lcd.flags & LCD_FLAG_L) == 0))
+			if (lcd.light_tempo == 0 &&
+			    ((lcd.flags & LCD_FLAG_L) == 0))
 				lcd_backlight(1);
 			lcd.light_tempo = FLASH_LIGHT_TEMPO;
 		} else if (lcd.light_tempo > 0) {
 			lcd.light_tempo--;
-			if (lcd.light_tempo == 0
-					&& ((lcd.flags & LCD_FLAG_L) == 0))
+			if (lcd.light_tempo == 0 &&
+			    ((lcd.flags & LCD_FLAG_L) == 0))
 				lcd_backlight(0);
 		}
 	}
@@ -2025,7 +2028,7 @@ static void panel_scan_timer(void)
 
 static void init_scan_timer(void)
 {
-	if (scan_timer.function != NULL)
+	if (scan_timer.function)
 		return;		/* already started */
 
 	setup_timer(&scan_timer, (void *)&panel_scan_timer, 0);
@@ -2060,12 +2063,12 @@ static int input_name2mask(const char *name, pmask_t *mask, pmask_t *value,
 			return 0;	/* input name not found */
 		neg = (in & 1);	/* odd (lower) names are negated */
 		in >>= 1;
-		im |= (1 << in);
+		im |= BIT(in);
 
 		name++;
 		if (isdigit(*name)) {
 			out = *name - '0';
-			om |= (1 << out);
+			om |= BIT(out);
 		} else if (*name == '-') {
 			out = 8;
 		} else {
@@ -2229,7 +2232,7 @@ static void panel_attach(struct parport *port)
 	/* panel_cb.flags = 0 should be PARPORT_DEV_EXCL? */
 
 	pprt = parport_register_dev_model(port, "panel", &panel_cb, 0);
-	if (pprt == NULL) {
+	if (!pprt) {
 		pr_err("%s: port->number=%d parport=%d, parport_register_device() failed\n",
 		       __func__, port->number, parport);
 		return;
@@ -2276,10 +2279,10 @@ static void panel_detach(struct parport *port)
 		       __func__, port->number, parport);
 		return;
 	}
-	if (scan_timer.function != NULL)
+	if (scan_timer.function)
 		del_timer_sync(&scan_timer);
 
-	if (pprt != NULL) {
+	if (pprt) {
 		if (keypad.enabled) {
 			misc_deregister(&keypad_dev);
 			keypad_initialized = 0;

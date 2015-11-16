@@ -270,8 +270,6 @@ static int fbtft_backlight_get_brightness(struct backlight_device *bd)
 
 void fbtft_unregister_backlight(struct fbtft_par *par)
 {
-	fbtft_par_dbg(DEBUG_BACKLIGHT, par, "%s()\n", __func__);
-
 	if (par->info->bl_dev) {
 		par->info->bl_dev->props.power = FB_BLANK_POWERDOWN;
 		backlight_update_status(par->info->bl_dev);
@@ -290,8 +288,6 @@ void fbtft_register_backlight(struct fbtft_par *par)
 	struct backlight_device *bd;
 	struct backlight_properties bl_props = { 0, };
 	struct gpio_desc *desc;
-
-	fbtft_par_dbg(DEBUG_BACKLIGHT, par, "%s()\n", __func__);
 
 	if (par->gpio.led[0] == -1) {
 		fbtft_par_dbg(DEBUG_BACKLIGHT, par,
@@ -358,8 +354,7 @@ static void fbtft_update_display(struct fbtft_par *par, unsigned start_line,
 				 unsigned end_line)
 {
 	size_t offset, len;
-	struct timespec ts_start, ts_end, ts_fps, ts_duration;
-	long fps_ms, fps_us, duration_ms, duration_us;
+	ktime_t ts_start, ts_end;
 	long fps, throughput;
 	bool timeit = false;
 	int ret = 0;
@@ -367,7 +362,7 @@ static void fbtft_update_display(struct fbtft_par *par, unsigned start_line,
 	if (unlikely(par->debug & (DEBUG_TIME_FIRST_UPDATE | DEBUG_TIME_EACH_UPDATE))) {
 		if ((par->debug & DEBUG_TIME_EACH_UPDATE) ||
 				((par->debug & DEBUG_TIME_FIRST_UPDATE) && !par->first_update_done)) {
-			getnstimeofday(&ts_start);
+			ts_start = ktime_get();
 			timeit = true;
 		}
 	}
@@ -404,30 +399,21 @@ static void fbtft_update_display(struct fbtft_par *par, unsigned start_line,
 			__func__);
 
 	if (unlikely(timeit)) {
-		getnstimeofday(&ts_end);
-		if (par->update_time.tv_nsec == 0 && par->update_time.tv_sec == 0) {
-			par->update_time.tv_sec = ts_start.tv_sec;
-			par->update_time.tv_nsec = ts_start.tv_nsec;
-		}
-		ts_fps = timespec_sub(ts_start, par->update_time);
-		par->update_time.tv_sec = ts_start.tv_sec;
-		par->update_time.tv_nsec = ts_start.tv_nsec;
-		fps_ms = (ts_fps.tv_sec * 1000) + ((ts_fps.tv_nsec / 1000000) % 1000);
-		fps_us = (ts_fps.tv_nsec / 1000) % 1000;
-		fps = fps_ms * 1000 + fps_us;
+		ts_end = ktime_get();
+		if (ktime_to_ns(par->update_time))
+			par->update_time = ts_start;
+
+		par->update_time = ts_start;
+		fps = ktime_us_delta(ts_start, par->update_time);
 		fps = fps ? 1000000 / fps : 0;
 
-		ts_duration = timespec_sub(ts_end, ts_start);
-		duration_ms = (ts_duration.tv_sec * 1000) + ((ts_duration.tv_nsec / 1000000) % 1000);
-		duration_us = (ts_duration.tv_nsec / 1000) % 1000;
-		throughput = duration_ms * 1000 + duration_us;
+		throughput = ktime_us_delta(ts_end, ts_start);
 		throughput = throughput ? (len * 1000) / throughput : 0;
 		throughput = throughput * 1000 / 1024;
 
 		dev_info(par->info->device,
-			"Display update: %ld kB/s (%ld.%.3ld ms), fps=%ld (%ld.%.3ld ms)\n",
-			throughput, duration_ms, duration_us,
-			fps, fps_ms, fps_us);
+			"Display update: %ld kB/s, fps=%ld\n",
+			throughput, fps);
 		par->first_update_done = true;
 	}
 }
@@ -770,7 +756,7 @@ struct fb_info *fbtft_framebuffer_alloc(struct fbtft_display *display,
 	if (!info)
 		goto alloc_fail;
 
-	info->screen_base = (u8 __force __iomem *)vmem;
+	info->screen_buffer = vmem;
 	info->fbops = fbops;
 	info->fbdefio = fbdefio;
 
@@ -910,7 +896,7 @@ EXPORT_SYMBOL(fbtft_framebuffer_alloc);
 void fbtft_framebuffer_release(struct fb_info *info)
 {
 	fb_deferred_io_cleanup(info);
-	vfree(info->screen_base);
+	vfree(info->screen_buffer);
 	framebuffer_release(info);
 }
 EXPORT_SYMBOL(fbtft_framebuffer_release);
@@ -1058,8 +1044,6 @@ static int fbtft_init_display_dt(struct fbtft_par *par)
 	u32 val;
 	int buf[64], i, j;
 
-	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
-
 	if (!node)
 		return -EINVAL;
 
@@ -1141,8 +1125,6 @@ int fbtft_init_display(struct fbtft_par *par)
 	char str[16];
 	int i = 0;
 	int j;
-
-	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
 
 	/* sanity check */
 	if (!par->init_sequence) {

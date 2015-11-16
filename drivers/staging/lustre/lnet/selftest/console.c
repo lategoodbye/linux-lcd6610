@@ -40,7 +40,6 @@
  * Author: Liang Zhen <liangzhen@clusterfs.com>
  */
 
-
 #include "../../include/linux/libcfs/libcfs.h"
 #include "../../include/linux/lnet/lib-lnet.h"
 #include "console.h"
@@ -2004,7 +2003,7 @@ lstcon_console_init(void)
 	console_session.ses_expired	  = 0;
 	console_session.ses_feats_updated = 0;
 	console_session.ses_features	  = LST_FEATS_MASK;
-	console_session.ses_laststamp	  = get_seconds();
+	console_session.ses_laststamp	  = ktime_get_real_seconds();
 
 	mutex_init(&console_session.ses_mutex);
 
@@ -2020,7 +2019,6 @@ lstcon_console_init(void)
 
 	for (i = 0; i < LST_GLOBAL_HASHSIZE; i++)
 		INIT_LIST_HEAD(&console_session.ses_ndl_hash[i]);
-
 
 	/* initialize acceptor service table */
 	lstcon_init_acceptor_service();

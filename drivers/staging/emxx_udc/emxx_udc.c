@@ -15,7 +15,7 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/delay.h>
 #include <linux/ioport.h>
@@ -40,11 +40,9 @@
 
 #include "emxx_udc.h"
 
-#define	DRIVER_DESC	"EMXX UDC driver"
 #define	DMA_ADDR_INVALID	(~(dma_addr_t)0)
 
 static const char	driver_name[] = "emxx_udc";
-static const char	driver_desc[] = DRIVER_DESC;
 
 /*===========================================================================*/
 /* Prototype */
@@ -213,7 +211,7 @@ static u32 _nbu2ss_get_begin_ram_address(struct nbu2ss_udc *udc)
 		}
 
 		if ((data >> 16) > last_ram_adr)
-			last_ram_adr = data>>16;
+			last_ram_adr = data >> 16;
 	}
 
 	return last_ram_adr + use_ram_size;
@@ -589,7 +587,7 @@ static int EP0_out_OverBytes(struct nbu2ss_udc *udc, u8 *pBuf, u32 length)
 	union usb_reg_access  Temp32;
 	union usb_reg_access  *pBuf32 = (union usb_reg_access *)pBuf;
 
-	if ((0 < length) && (length < sizeof(u32))) {
+	if ((length > 0) && (length < sizeof(u32))) {
 		Temp32.dw = _nbu2ss_readl(&udc->p_regs->EP0_READ);
 		for (i = 0 ; i < length ; i++)
 			pBuf32->byte.DATA[i] = Temp32.byte.DATA[i];
@@ -635,7 +633,7 @@ static int EP0_in_OverBytes(struct nbu2ss_udc *udc, u8 *pBuf, u32 iRemainSize)
 	union usb_reg_access  Temp32;
 	union usb_reg_access  *pBuf32 = (union usb_reg_access *)pBuf;
 
-	if ((0 < iRemainSize) && (iRemainSize < sizeof(u32))) {
+	if ((iRemainSize > 0) && (iRemainSize < sizeof(u32))) {
 		for (i = 0 ; i < iRemainSize ; i++)
 			Temp32.byte.DATA[i] = pBuf32->byte.DATA[i];
 		_nbu2ss_ep_in_end(udc, 0, Temp32.dw, iRemainSize);
@@ -770,7 +768,7 @@ static int _nbu2ss_ep0_out_transfer(
 		req->req.actual += result;
 		iRecvLength -= result;
 
-		if ((0 < iRecvLength) && (iRecvLength < sizeof(u32))) {
+		if ((iRecvLength > 0) && (iRecvLength < sizeof(u32))) {
 			pBuffer += result;
 			iRemainSize -= result;
 
@@ -849,11 +847,11 @@ static int _nbu2ss_out_dma(
 	dmacnt = (length / mpkt);
 	lmpkt = (length % mpkt) & ~(u32)0x03;
 
-	if (DMA_MAX_COUNT < dmacnt) {
+	if (dmacnt > DMA_MAX_COUNT) {
 		dmacnt = DMA_MAX_COUNT;
 		lmpkt = 0;
-	} else if (0 != lmpkt) {
-		if (0 == dmacnt)
+	} else if (lmpkt != 0) {
+		if (dmacnt == 0)
 			burst = 0;	/* Burst OFF */
 		dmacnt++;
 	}
@@ -864,7 +862,7 @@ static int _nbu2ss_out_dma(
 	data = ((dmacnt & 0xff) << 16) | DCR1_EPn_DIR0 | DCR1_EPn_REQEN;
 	_nbu2ss_writel(&preg->EP_DCR[num].EP_DCR1, data);
 
-	if (0 == burst) {
+	if (burst == 0) {
 		_nbu2ss_writel(&preg->EP_REGS[num].EP_LEN_DCNT, 0);
 		_nbu2ss_bitclr(&preg->EP_REGS[num].EP_DMA_CTRL, EPn_BURST_SET);
 	} else {
@@ -1269,7 +1267,7 @@ static int _nbu2ss_start_transfer(
 		/* EPn */
 		if (ep->direct == USB_DIR_OUT) {
 			/* OUT */
-			if (bflag == FALSE)
+			if (!bflag)
 				nret = _nbu2ss_epn_out_transfer(udc, ep, req);
 		} else {
 			/* IN */
@@ -1438,7 +1436,7 @@ static int _nbu2ss_set_feature_device(
 
 	switch (selector) {
 	case USB_DEVICE_REMOTE_WAKEUP:
-		if (0x0000 == wIndex) {
+		if (wIndex == 0x0000) {
 			udc->remote_wakeup = U2F_ENABLE;
 			result = 0;
 		}
@@ -1495,8 +1493,8 @@ static inline int _nbu2ss_req_feature(struct nbu2ss_udc *udc, bool bset)
 	u8	ep_adrs;
 	int	result = -EOPNOTSUPP;
 
-	if ((0x0000 != udc->ctrl.wLength) ||
-			(USB_DIR_OUT != direction)) {
+	if ((udc->ctrl.wLength != 0x0000) ||
+			(direction != USB_DIR_OUT)) {
 		return -EINVAL;
 	}
 
@@ -1509,9 +1507,9 @@ static inline int _nbu2ss_req_feature(struct nbu2ss_udc *udc, bool bset)
 
 	case USB_RECIP_ENDPOINT:
 		if (0x0000 == (wIndex & 0xFF70)) {
-			if (USB_ENDPOINT_HALT == selector) {
+			if (selector == USB_ENDPOINT_HALT) {
 				ep_adrs = wIndex & 0xFF;
-				if (bset == FALSE) {
+				if (!bset) {
 					_nbu2ss_endpoint_toggle_reset(
 						udc, ep_adrs);
 				}
@@ -1588,8 +1586,8 @@ static int std_req_get_status(struct nbu2ss_udc *udc)
 	u8	ep_adrs;
 	int	result = -EINVAL;
 
-	if ((0x0000 != udc->ctrl.wValue)
-		|| (USB_DIR_IN != direction)) {
+	if ((udc->ctrl.wValue != 0x0000)
+		|| (direction != USB_DIR_IN)) {
 
 		return result;
 	}
@@ -1653,9 +1651,9 @@ static int std_req_set_address(struct nbu2ss_udc *udc)
 	int		result = 0;
 	u32		wValue = udc->ctrl.wValue;
 
-	if ((0x00 != udc->ctrl.bRequestType)	||
-		(0x0000 != udc->ctrl.wIndex)	||
-		(0x0000 != udc->ctrl.wLength)) {
+	if ((udc->ctrl.bRequestType != 0x00)	||
+		(udc->ctrl.wIndex != 0x0000)	||
+		(udc->ctrl.wLength != 0x0000)) {
 		return -EINVAL;
 	}
 
@@ -1675,9 +1673,9 @@ static int std_req_set_configuration(struct nbu2ss_udc *udc)
 {
 	u32 ConfigValue = (u32)(udc->ctrl.wValue & 0x00ff);
 
-	if ((0x0000 != udc->ctrl.wIndex)	||
-		(0x0000 != udc->ctrl.wLength)	||
-		(0x00 != udc->ctrl.bRequestType)) {
+	if ((udc->ctrl.wIndex != 0x0000)	||
+		(udc->ctrl.wLength != 0x0000)	||
+		(udc->ctrl.bRequestType != 0x00)) {
 		return -EINVAL;
 	}
 
@@ -1758,7 +1756,7 @@ static inline int _nbu2ss_decode_request(struct nbu2ss_udc *udc)
 		}
 	}
 
-	if (bcall_back == FALSE) {
+	if (!bcall_back) {
 		if (udc->ep0state == EP0_IN_STATUS_PHASE) {
 			if (nret >= 0) {
 				/*--------------------------------------*/
@@ -2046,7 +2044,7 @@ static inline void _nbu2ss_epn_in_dma_int(
 
 	preq = &req->req;
 
-	if (req->dma_flag == FALSE)
+	if (!req->dma_flag)
 		return;
 
 	preq->actual += req->div_len;
@@ -2758,7 +2756,7 @@ static int nbu2ss_ep_queue(
 	bflag = list_empty(&ep->queue);
 	list_add_tail(&req->queue, &ep->queue);
 
-	if ((bflag != FALSE) && (ep->stalled == FALSE)) {
+	if (bflag && !ep->stalled) {
 
 		result = _nbu2ss_start_transfer(udc, ep, req, FALSE);
 		if (result < 0) {
@@ -3321,28 +3319,6 @@ static void nbu2ss_drv_shutdown(struct platform_device *pdev)
 }
 
 /*-------------------------------------------------------------------------*/
-static int __exit nbu2ss_drv_remove(struct platform_device *pdev)
-{
-	struct nbu2ss_udc	*udc;
-	struct nbu2ss_ep	*ep;
-	int	i;
-
-	udc = &udc_controller;
-
-	for (i = 0; i < NUM_ENDPOINTS; i++) {
-		ep = &udc->ep[i];
-		if (ep->virt_buf)
-			dma_free_coherent(NULL, PAGE_SIZE,
-				(void *)ep->virt_buf, ep->phys_buf);
-	}
-
-	/* Interrupt Handler - Release */
-	free_irq(INT_VBUS, udc);
-
-	return 0;
-}
-
-/*-------------------------------------------------------------------------*/
 static int nbu2ss_drv_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct nbu2ss_udc	*udc;
@@ -3394,17 +3370,12 @@ static int nbu2ss_drv_resume(struct platform_device *pdev)
 static struct platform_driver udc_driver = {
 	.probe		= nbu2ss_drv_probe,
 	.shutdown	= nbu2ss_drv_shutdown,
-	.remove		= __exit_p(nbu2ss_drv_remove),
 	.suspend	= nbu2ss_drv_suspend,
 	.resume		= nbu2ss_drv_resume,
 	.driver		= {
-		.name	= driver_name,
+		.name			= driver_name,
+		.suppress_bind_attrs	= true,
 	},
 };
 
-module_platform_driver(udc_driver);
-
-MODULE_DESCRIPTION(DRIVER_DESC);
-MODULE_AUTHOR("Renesas Electronics Corporation");
-MODULE_LICENSE("GPL");
-
+builtin_platform_driver(udc_driver);

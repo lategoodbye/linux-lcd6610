@@ -10,6 +10,7 @@
 #include <linux/spi/spi.h>
 
 #include "linux_wlan_common.h"
+#include "linux_wlan_spi.h"
 
 #define USE_SPI_DMA     0       /* johnny add */
 
@@ -38,7 +39,7 @@
  #define MAX_SPEED 6000000
 #endif /* WILC_ASIC_A0 */
 
-static uint32_t SPEED = MIN_SPEED;
+static u32 SPEED = MIN_SPEED;
 
 struct spi_device *wilc_spi_dev;
 void linux_spi_deinit(void *vp);
@@ -115,7 +116,7 @@ int linux_spi_init(void *vp)
 
 #if defined(TXRX_PHASE_SIZE)
 
-int linux_spi_write(uint8_t *b, uint32_t len)
+int linux_spi_write(u8 *b, u32 len)
 {
 	int ret;
 
@@ -125,10 +126,8 @@ int linux_spi_write(uint8_t *b, uint32_t len)
 		int remainder = len % TXRX_PHASE_SIZE;
 
 		char *r_buffer = kzalloc(TXRX_PHASE_SIZE, GFP_KERNEL);
-
-		if (!r_buffer) {
-			PRINT_ER("Failed to allocate memory for r_buffer\n");
-		}
+		if (!r_buffer)
+			return -ENOMEM;
 
 		if (blk) {
 			while (i < blk)	{
@@ -194,7 +193,7 @@ int linux_spi_write(uint8_t *b, uint32_t len)
 }
 
 #else
-int linux_spi_write(uint8_t *b, uint32_t len)
+int linux_spi_write(u8 *b, u32 len)
 {
 
 	int ret;
@@ -208,10 +207,9 @@ int linux_spi_write(uint8_t *b, uint32_t len)
 			.delay_usecs = 0,
 		};
 		char *r_buffer = kzalloc(len, GFP_KERNEL);
+		if (!r_buffer)
+			return -ENOMEM;
 
-		if (!r_buffer) {
-			PRINT_ER("Failed to allocate memory for r_buffer\n");
-		}
 		tr.rx_buf = r_buffer;
 		PRINT_D(BUS_DBG, "Request writing %d bytes\n", len);
 
@@ -246,7 +244,7 @@ int linux_spi_write(uint8_t *b, uint32_t len)
 
 #if defined(TXRX_PHASE_SIZE)
 
-int linux_spi_read(unsigned char *rb, unsigned long rlen)
+int linux_spi_read(u8 *rb, u32 rlen)
 {
 	int ret;
 
@@ -257,10 +255,8 @@ int linux_spi_read(unsigned char *rb, unsigned long rlen)
 		int remainder = rlen % TXRX_PHASE_SIZE;
 
 		char *t_buffer = kzalloc(TXRX_PHASE_SIZE, GFP_KERNEL);
-
-		if (!t_buffer) {
-			PRINT_ER("Failed to allocate memory for t_buffer\n");
-		}
+		if (!t_buffer)
+			return -ENOMEM;
 
 		if (blk) {
 			while (i < blk)	{
@@ -312,7 +308,7 @@ int linux_spi_read(unsigned char *rb, unsigned long rlen)
 
 		kfree(t_buffer);
 	} else {
-		PRINT_ER("can't read data with the following length: %ld\n", rlen);
+		PRINT_ER("can't read data with the following length: %u\n", rlen);
 		ret = -1;
 	}
 	/* change return value to match WILC interface */
@@ -322,7 +318,7 @@ int linux_spi_read(unsigned char *rb, unsigned long rlen)
 }
 
 #else
-int linux_spi_read(unsigned char *rb, unsigned long rlen)
+int linux_spi_read(u8 *rb, u32 rlen)
 {
 
 	int ret;
@@ -337,10 +333,9 @@ int linux_spi_read(unsigned char *rb, unsigned long rlen)
 
 		};
 		char *t_buffer = kzalloc(rlen, GFP_KERNEL);
+		if (!t_buffer)
+			return -ENOMEM;
 
-		if (!t_buffer) {
-			PRINT_ER("Failed to allocate memory for t_buffer\n");
-		}
 		tr.tx_buf = t_buffer;
 
 		memset(&msg, 0, sizeof(msg));
@@ -357,7 +352,7 @@ int linux_spi_read(unsigned char *rb, unsigned long rlen)
 		}
 		kfree(t_buffer);
 	} else {
-		PRINT_ER("can't read data with the following length: %ld\n", rlen);
+		PRINT_ER("can't read data with the following length: %u\n", rlen);
 		ret = -1;
 	}
 	/* change return value to match WILC interface */
@@ -368,7 +363,7 @@ int linux_spi_read(unsigned char *rb, unsigned long rlen)
 
 #endif
 
-int linux_spi_write_read(unsigned char *wb, unsigned char *rb, unsigned int rlen)
+int linux_spi_write_read(u8 *wb, u8 *rb, u32 rlen)
 {
 
 	int ret;
@@ -396,7 +391,7 @@ int linux_spi_write_read(unsigned char *wb, unsigned char *rb, unsigned int rlen
 			PRINT_ER("SPI transaction failed\n");
 		}
 	} else {
-		PRINT_ER("can't read data with the following length: %d\n", rlen);
+		PRINT_ER("can't read data with the following length: %u\n", rlen);
 		ret = -1;
 	}
 	/* change return value to match WILC interface */

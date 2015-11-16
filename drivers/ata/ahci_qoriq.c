@@ -45,7 +45,7 @@
 enum ahci_qoriq_type {
 	AHCI_LS1021A,
 	AHCI_LS1043A,
-	AHCI_LS2085A,
+	AHCI_LS2080A,
 };
 
 struct ahci_qoriq_priv {
@@ -57,7 +57,7 @@ struct ahci_qoriq_priv {
 static const struct of_device_id ahci_qoriq_of_match[] = {
 	{ .compatible = "fsl,ls1021a-ahci", .data = (void *)AHCI_LS1021A},
 	{ .compatible = "fsl,ls1043a-ahci", .data = (void *)AHCI_LS1043A},
-	{ .compatible = "fsl,ls2085a-ahci", .data = (void *)AHCI_LS2085A},
+	{ .compatible = "fsl,ls2080a-ahci", .data = (void *)AHCI_LS2080A},
 	{},
 };
 MODULE_DEVICE_TABLE(of, ahci_qoriq_of_match);
@@ -76,6 +76,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
 	struct ata_taskfile tf;
 	bool online;
 	int rc;
+	bool ls1021a_workaround = (qoriq_priv->type == AHCI_LS1021A);
 
 	DPRINTK("ENTER\n");
 
@@ -92,7 +93,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
 	 * After the sequence is complete, software should restore the
 	 * PxCMD and PxIS with the stored values.
 	 */
-	if (qoriq_priv->type == AHCI_LS1021A) {
+	if (ls1021a_workaround) {
 		px_cmd = readl(port_mmio + PORT_CMD);
 		px_is = readl(port_mmio + PORT_IRQ_STAT);
 	}
@@ -106,7 +107,7 @@ static int ahci_qoriq_hardreset(struct ata_link *link, unsigned int *class,
 				 ahci_check_ready);
 
 	/* restore the PxCMD and PxIS on ls1021 */
-	if (qoriq_priv->type == AHCI_LS1021A) {
+	if (ls1021a_workaround) {
 		px_val = readl(port_mmio + PORT_CMD);
 		if (px_val != px_cmd)
 			writel(px_cmd, port_mmio + PORT_CMD);
@@ -130,7 +131,7 @@ static struct ata_port_operations ahci_qoriq_ops = {
 	.hardreset	= ahci_qoriq_hardreset,
 };
 
-static const struct ata_port_info ahci_qoriq_port_info = {
+static struct ata_port_info ahci_qoriq_port_info = {
 	.flags		= AHCI_FLAG_COMMON | ATA_FLAG_NCQ,
 	.pio_mask	= ATA_PIO4,
 	.udma_mask	= ATA_UDMA6,
@@ -158,7 +159,7 @@ static int ahci_qoriq_phy_init(struct ahci_host_priv *hpriv)
 		break;
 
 	case AHCI_LS1043A:
-	case AHCI_LS2085A:
+	case AHCI_LS2080A:
 		writel(AHCI_PORT_PHY_1_CFG, reg_base + PORT_PHY1);
 		break;
 	}
@@ -206,6 +207,12 @@ static int ahci_qoriq_probe(struct platform_device *pdev)
 	rc = ahci_qoriq_phy_init(hpriv);
 	if (rc)
 		goto disable_resources;
+
+	/* Workaround for ls2080a */
+	if (qoriq_priv->type == AHCI_LS2080A) {
+		hpriv->flags |= AHCI_HFLAG_NO_NCQ;
+		ahci_qoriq_port_info.flags &= ~ATA_FLAG_NCQ;
+	}
 
 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_qoriq_port_info,
 				     &ahci_qoriq_sht);

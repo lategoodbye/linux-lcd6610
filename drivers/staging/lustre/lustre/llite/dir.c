@@ -224,7 +224,7 @@ static int ll_dir_filler(void *_hash, struct page *page0)
 
 		prefetchw(&page->flags);
 		ret = add_to_page_cache_lru(page, inode->i_mapping, offset,
-					    GFP_KERNEL);
+					    GFP_NOFS);
 		if (ret == 0) {
 			unlock_page(page);
 		} else {
@@ -907,7 +907,6 @@ static int ll_ioc_copy_start(struct super_block *sb, struct hsm_copy *copy)
 	hpk.hpk_errval = 0;
 	hpk.hpk_data_version = 0;
 
-
 	/* For archive request, we need to read the current file version. */
 	if (copy->hc_hai.hai_action == HSMA_ARCHIVE) {
 		struct inode	*inode;
@@ -1046,7 +1045,6 @@ progress:
 
 	return rc;
 }
-
 
 static int copy_and_ioctl(int cmd, struct obd_export *exp,
 			  const void __user *data, size_t size)
@@ -1734,6 +1732,9 @@ out_quotactl:
 	}
 	case OBD_IOC_CHANGELOG_SEND:
 	case OBD_IOC_CHANGELOG_CLEAR:
+		if (!capable(CFS_CAP_SYS_ADMIN))
+			return -EPERM;
+
 		rc = copy_and_ioctl(cmd, sbi->ll_md_exp, (void *)arg,
 				    sizeof(struct ioc_changelog));
 		return rc;

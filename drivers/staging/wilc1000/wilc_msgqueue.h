@@ -10,8 +10,22 @@
  *  @version	1.0
  */
 
-#include "wilc_platform.h"
-#include "wilc_errorsupport.h"
+#include <linux/semaphore.h>
+
+/* Message Queue type is a structure */
+typedef struct __Message_struct {
+	void *pvBuffer;
+	u32 u32Length;
+	struct __Message_struct *pstrNext;
+} Message;
+
+typedef struct __MessageQueue_struct {
+	struct semaphore hSem;
+	spinlock_t strCriticalSection;
+	bool bExiting;
+	u32 u32ReceiversCount;
+	Message *pstrMessageList;
+} WILC_MsgQueueHandle;
 
 /*!
  *  @brief		Creates a new Message queue

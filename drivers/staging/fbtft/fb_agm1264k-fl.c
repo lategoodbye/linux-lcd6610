@@ -74,8 +74,6 @@ static int init_display(struct fbtft_par *par)
 {
 	u8 i;
 
-	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
-
 	par->fbtftops.reset(par);
 
 	for (i = 0; i < 2; ++i) {
@@ -179,7 +177,7 @@ static void write_reg8_bus8(struct fbtft_par *par, int len, ...)
 {
 	va_list args;
 	int i, ret;
-	u8 *buf = (u8 *)par->buf;
+	u8 *buf = par->buf;
 
 	if (unlikely(par->debug & DEBUG_WRITE_REGISTER)) {
 		va_start(args, len);
@@ -268,7 +266,7 @@ construct_line_bitmap(struct fbtft_par *par, u8 *dest, signed short *src,
 
 static int write_vmem(struct fbtft_par *par, size_t offset, size_t len)
 {
-	u16 *vmem16 = (u16 *)par->info->screen_base;
+	u16 *vmem16 = (u16 *)par->info->screen_buffer;
 	u8 *buf = par->txbuf.buf;
 	int x, y;
 	int ret = 0;
@@ -279,8 +277,6 @@ static int write_vmem(struct fbtft_par *par, size_t offset, size_t len)
 
 	if (!convert_buf)
 		return -ENOMEM;
-
-	fbtft_par_dbg(DEBUG_WRITE_VMEM, par, "%s()\n", __func__);
 
 	/* converting to grayscale16 */
 	for (x = 0; x < par->info->var.xres; ++x)

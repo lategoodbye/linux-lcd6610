@@ -123,7 +123,9 @@ extern kib_tunables_t  kiblnd_tunables;
 				     IBLND_CREDIT_HIGHWATER_V1 : \
 				     *kiblnd_tunables.kib_peercredits_hiw) /* when eagerly to return credits */
 
-#define kiblnd_rdma_create_id(cb, dev, ps, qpt) rdma_create_id(cb, dev, ps, qpt)
+#define kiblnd_rdma_create_id(cb, dev, ps, qpt) rdma_create_id(&init_net, \
+							       cb, dev, \
+							       ps, qpt)
 
 static inline int
 kiblnd_concurrent_sends_v1(void)
@@ -504,7 +506,7 @@ typedef struct kib_tx                         /* transmit message */
 	__u64                 tx_msgaddr;     /* message buffer (I/O addr) */
 	DECLARE_PCI_UNMAP_ADDR(tx_msgunmap);  /* for dma_unmap_single() */
 	int                   tx_nwrq;        /* # send work items */
-	struct ib_send_wr     *tx_wrq;        /* send work items... */
+	struct ib_rdma_wr     *tx_wrq;        /* send work items... */
 	struct ib_sge         *tx_sge;        /* ...and their memory */
 	kib_rdma_desc_t       *tx_rd;         /* rdma descriptor */
 	int                   tx_nfrags;      /* # entries in... */
@@ -848,7 +850,6 @@ kiblnd_rd_msg_size(kib_rdma_desc_t *rd, int msgtype, int n)
 	       offsetof(kib_putack_msg_t, ibpam_rd.rd_frags[n]);
 }
 
-
 static inline __u64
 kiblnd_dma_mapping_error(struct ib_device *dev, u64 dma_addr)
 {
@@ -905,16 +906,12 @@ static inline unsigned int kiblnd_sg_dma_len(struct ib_device *dev,
 #define KIBLND_CONN_PARAM(e)     ((e)->param.conn.private_data)
 #define KIBLND_CONN_PARAM_LEN(e) ((e)->param.conn.private_data_len)
 
-
 struct ib_mr *kiblnd_find_rd_dma_mr(kib_hca_dev_t *hdev,
 				    kib_rdma_desc_t *rd);
 struct ib_mr *kiblnd_find_dma_mr(kib_hca_dev_t *hdev,
 				 __u64 addr, __u64 size);
 void kiblnd_map_rx_descs(kib_conn_t *conn);
 void kiblnd_unmap_rx_descs(kib_conn_t *conn);
-int kiblnd_map_tx(lnet_ni_t *ni, kib_tx_t *tx,
-		  kib_rdma_desc_t *rd, int nfrags);
-void kiblnd_unmap_tx(lnet_ni_t *ni, kib_tx_t *tx);
 void kiblnd_pool_free_node(kib_pool_t *pool, struct list_head *node);
 struct list_head *kiblnd_pool_alloc_node(kib_poolset_t *ps);
 

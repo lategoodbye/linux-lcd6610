@@ -104,6 +104,20 @@ struct drm_fb_helper_connector {
 	struct drm_connector *connector;
 };
 
+/**
+ * struct drm_fb_helper - helper to emulate fbdev on top of kms
+ * @fb:  Scanout framebuffer object
+ * @dev:  DRM device
+ * @crtc_count: number of possible CRTCs
+ * @crtc_info: per-CRTC helper state (mode, x/y offset, etc)
+ * @connector_count: number of connected connectors
+ * @connector_info_alloc_count: size of connector_info
+ * @funcs: driver callbacks for fb helper
+ * @fbdev: emulated fbdev device info struct
+ * @pseudo_palette: fake palette of 16 colors
+ * @kernel_fb_list: list_head in kernel_fb_helper_list
+ * @delayed_hotplug: was there a hotplug while kms master active?
+ */
 struct drm_fb_helper {
 	struct drm_framebuffer *fb;
 	struct drm_device *dev;
@@ -120,6 +134,17 @@ struct drm_fb_helper {
 	/* we got a hotplug but fbdev wasn't running the console
 	   delay until next set_par */
 	bool delayed_hotplug;
+
+	/**
+	 * @atomic:
+	 *
+	 * Use atomic updates for restore_fbdev_mode(), etc.  This defaults to
+	 * true if driver has DRIVER_ATOMIC feature flag, but drivers can
+	 * override it to true after drm_fb_helper_init() if they support atomic
+	 * modeset but do not yet advertise DRIVER_ATOMIC (note that fb-helper
+	 * does not require ASYNC commits).
+	 */
+	bool atomic;
 };
 
 #ifdef CONFIG_DRM_FBDEV_EMULATION

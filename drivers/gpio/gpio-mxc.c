@@ -33,7 +33,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/module.h>
-#include <asm-generic/bug.h>
+#include <linux/bug.h>
 
 enum mxc_gpio_hwtype {
 	IMX1_GPIO,	/* runs on i.mx1 */
@@ -272,7 +272,7 @@ static void mxc_gpio_irq_handler(struct mxc_gpio_port *port, u32 irq_stat)
 }
 
 /* MX1 and MX3 has one interrupt *per* gpio port */
-static void mx3_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+static void mx3_gpio_irq_handler(struct irq_desc *desc)
 {
 	u32 irq_stat;
 	struct mxc_gpio_port *port = irq_desc_get_handler_data(desc);
@@ -288,7 +288,7 @@ static void mx3_gpio_irq_handler(u32 irq, struct irq_desc *desc)
 }
 
 /* MX2 has one interrupt *for all* gpio ports */
-static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+static void mx2_gpio_irq_handler(struct irq_desc *desc)
 {
 	u32 irq_msk, irq_stat;
 	struct mxc_gpio_port *port;

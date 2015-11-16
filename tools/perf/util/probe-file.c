@@ -22,8 +22,7 @@
 #include "color.h"
 #include "symbol.h"
 #include "thread.h"
-#include <api/fs/debugfs.h>
-#include <api/fs/tracefs.h>
+#include <api/fs/tracing_path.h>
 #include "probe-event.h"
 #include "probe-file.h"
 #include "session.h"
@@ -73,21 +72,11 @@ static void print_both_open_warning(int kerr, int uerr)
 static int open_probe_events(const char *trace_file, bool readwrite)
 {
 	char buf[PATH_MAX];
-	const char *__debugfs;
 	const char *tracing_dir = "";
 	int ret;
 
-	__debugfs = tracefs_find_mountpoint();
-	if (__debugfs == NULL) {
-		tracing_dir = "tracing/";
-
-		__debugfs = debugfs_find_mountpoint();
-		if (__debugfs == NULL)
-			return -ENOTSUP;
-	}
-
 	ret = e_snprintf(buf, PATH_MAX, "%s/%s%s",
-			 __debugfs, tracing_dir, trace_file);
+			 tracing_path, tracing_dir, trace_file);
 	if (ret >= 0) {
 		pr_debug("Opening %s write=%d\n", buf, readwrite);
 		if (readwrite && !probe_event_dry_run)
@@ -148,6 +137,9 @@ struct strlist *probe_file__get_rawlist(int fd)
 	char buf[MAX_CMDLEN];
 	char *p;
 	struct strlist *sl;
+
+	if (fd < 0)
+		return NULL;
 
 	sl = strlist__new(NULL, NULL);
 
@@ -281,6 +273,9 @@ int probe_file__get_events(int fd, struct strfilter *filter,
 	struct str_node *ent;
 	const char *p;
 	int ret = -ENOENT;
+
+	if (!plist)
+		return -EINVAL;
 
 	namelist = __probe_file__get_namelist(fd, true);
 	if (!namelist)

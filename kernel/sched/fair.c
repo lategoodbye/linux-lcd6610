@@ -661,11 +661,12 @@ static unsigned long task_h_load(struct task_struct *p);
 
 /*
  * We choose a half-life close to 1 scheduling period.
- * Note: The tables below are dependent on this value.
+ * Note: The tables runnable_avg_yN_inv and runnable_avg_yN_sum are
+ * dependent on this value.
  */
 #define LOAD_AVG_PERIOD 32
 #define LOAD_AVG_MAX 47742 /* maximum possible load avg */
-#define LOAD_AVG_MAX_N 345 /* number of full periods to produce LOAD_MAX_AVG */
+#define LOAD_AVG_MAX_N 345 /* number of full periods to produce LOAD_AVG_MAX */
 
 /* Give new sched_entity start runnable values to heavy its load in infant time */
 void init_entity_runnable_average(struct sched_entity *se)
@@ -2157,7 +2158,7 @@ void task_numa_work(struct callback_head *work)
 	struct vm_area_struct *vma;
 	unsigned long start, end;
 	unsigned long nr_pte_updates = 0;
-	long pages;
+	long pages, virtpages;
 
 	WARN_ON_ONCE(p != container_of(work, struct task_struct, numa_work));
 
@@ -2203,8 +2204,10 @@ void task_numa_work(struct callback_head *work)
 	start = mm->numa_scan_offset;
 	pages = sysctl_numa_balancing_scan_size;
 	pages <<= 20 - PAGE_SHIFT; /* MB in pages */
+	virtpages = pages * 8;	   /* Scan up to this much virtual space */
 	if (!pages)
 		return;
+
 
 	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, start);
@@ -2240,18 +2243,22 @@ void task_numa_work(struct callback_head *work)
 			start = max(start, vma->vm_start);
 			end = ALIGN(start + (pages << PAGE_SHIFT), HPAGE_SIZE);
 			end = min(end, vma->vm_end);
-			nr_pte_updates += change_prot_numa(vma, start, end);
+			nr_pte_updates = change_prot_numa(vma, start, end);
 
 			/*
-			 * Scan sysctl_numa_balancing_scan_size but ensure that
-			 * at least one PTE is updated so that unused virtual
-			 * address space is quickly skipped.
+			 * Try to scan sysctl_numa_balancing_size worth of
+			 * hpages that have at least one present PTE that
+			 * is not already pte-numa. If the VMA contains
+			 * areas that are unused or already full of prot_numa
+			 * PTEs, scan up to virtpages, to skip through those
+			 * areas faster.
 			 */
 			if (nr_pte_updates)
 				pages -= (end - start) >> PAGE_SHIFT;
+			virtpages -= (end - start) >> PAGE_SHIFT;
 
 			start = end;
-			if (pages <= 0)
+			if (pages <= 0 || virtpages <= 0)
 				goto out;
 
 			cond_resched();
@@ -2295,7 +2302,7 @@ void task_tick_numa(struct rq *rq, struct task_struct *curr)
 	now = curr->se.sum_exec_runtime;
 	period = (u64)curr->numa_scan_period * NSEC_PER_MSEC;
 
-	if (now - curr->node_stamp > period) {
+	if (now > curr->node_stamp + period) {
 		if (!curr->node_stamp)
 			curr->numa_scan_period = task_scan_min(curr);
 		curr->node_stamp += period;
@@ -2363,7 +2370,7 @@ static inline long calc_tg_weight(struct task_group *tg, struct cfs_rq *cfs_rq)
 	 */
 	tg_weight = atomic_long_read(&tg->load_avg);
 	tg_weight -= cfs_rq->tg_load_avg_contrib;
-	tg_weight += cfs_rq_load_avg(cfs_rq);
+	tg_weight += cfs_rq->load.weight;
 
 	return tg_weight;
 }
@@ -2373,7 +2380,7 @@ static long calc_cfs_shares(struct cfs_rq *cfs_rq, struct task_group *tg)
 	long tg_weight, load, shares;
 
 	tg_weight = calc_tg_weight(tg, cfs_rq);
-	load = cfs_rq_load_avg(cfs_rq);
+	load = cfs_rq->load.weight;
 
 	shares = (tg->shares * load);
 	if (tg_weight)
@@ -2679,12 +2686,13 @@ static inline u64 cfs_rq_clock_task(struct cfs_rq *cfs_rq);
 static inline int update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq)
 {
 	struct sched_avg *sa = &cfs_rq->avg;
-	int decayed;
+	int decayed, removed = 0;
 
 	if (atomic_long_read(&cfs_rq->removed_load_avg)) {
 		long r = atomic_long_xchg(&cfs_rq->removed_load_avg, 0);
 		sa->load_avg = max_t(long, sa->load_avg - r, 0);
 		sa->load_sum = max_t(s64, sa->load_sum - r * LOAD_AVG_MAX, 0);
+		removed = 1;
 	}
 
 	if (atomic_long_read(&cfs_rq->removed_util_avg)) {
@@ -2701,7 +2709,7 @@ static inline int update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq)
 	cfs_rq->load_last_update_time_copy = sa->last_update_time;
 #endif
 
-	return decayed;
+	return decayed || removed;
 }
 
 /* Update task and its cfs_rq load average */
@@ -5002,7 +5010,7 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
  * previous cpu.  However, the caller only guarantees p->pi_lock is held; no
  * other assumptions, including the state of rq->lock, should be made.
  */
-static void migrate_task_rq_fair(struct task_struct *p, int next_cpu)
+static void migrate_task_rq_fair(struct task_struct *p)
 {
 	/*
 	 * We are supposed to update the task to "current" time, then its up to date
@@ -6266,9 +6274,9 @@ group_is_overloaded(struct lb_env *env, struct sg_lb_stats *sgs)
 	return false;
 }
 
-static enum group_type group_classify(struct lb_env *env,
-		struct sched_group *group,
-		struct sg_lb_stats *sgs)
+static inline enum
+group_type group_classify(struct sched_group *group,
+			  struct sg_lb_stats *sgs)
 {
 	if (sgs->group_no_capacity)
 		return group_overloaded;
@@ -6333,7 +6341,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 	sgs->group_weight = group->group_weight;
 
 	sgs->group_no_capacity = group_is_overloaded(env, sgs);
-	sgs->group_type = group_classify(env, group, sgs);
+	sgs->group_type = group_classify(group, sgs);
 }
 
 /**
@@ -6467,7 +6475,7 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
 		    group_has_capacity(env, &sds->local_stat) &&
 		    (sgs->sum_nr_running > 1)) {
 			sgs->group_no_capacity = 1;
-			sgs->group_type = group_overloaded;
+			sgs->group_type = group_classify(sg, sgs);
 		}
 
 		if (update_sd_pick_busiest(env, sds, sg, sgs)) {
@@ -7874,7 +7882,7 @@ static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
 		entity_tick(cfs_rq, se, queued);
 	}
 
-	if (!static_branch_unlikely(&sched_numa_balancing))
+	if (static_branch_unlikely(&sched_numa_balancing))
 		task_tick_numa(rq, curr);
 }
 

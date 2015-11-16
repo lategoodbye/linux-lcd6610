@@ -7,18 +7,19 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#include "debugfs.h"
-#include "tracefs.h"
+#include "fs.h"
 
 #include "tracing_path.h"
 
 
-char tracing_path[PATH_MAX + 1]        = "/sys/kernel/debug/tracing";
-char tracing_events_path[PATH_MAX + 1] = "/sys/kernel/debug/tracing/events";
+char tracing_mnt[PATH_MAX]         = "/sys/kernel/debug";
+char tracing_path[PATH_MAX]        = "/sys/kernel/debug/tracing";
+char tracing_events_path[PATH_MAX] = "/sys/kernel/debug/tracing/events";
 
 
 static void __tracing_path_set(const char *tracing, const char *mountpoint)
 {
+	snprintf(tracing_mnt, sizeof(tracing_mnt), "%s", mountpoint);
 	snprintf(tracing_path, sizeof(tracing_path), "%s/%s",
 		 mountpoint, tracing);
 	snprintf(tracing_events_path, sizeof(tracing_events_path), "%s/%s%s",
@@ -29,7 +30,7 @@ static const char *tracing_path_tracefs_mount(void)
 {
 	const char *mnt;
 
-	mnt = tracefs_mount(NULL);
+	mnt = tracefs__mount();
 	if (!mnt)
 		return NULL;
 
@@ -42,7 +43,7 @@ static const char *tracing_path_debugfs_mount(void)
 {
 	const char *mnt;
 
-	mnt = debugfs_mount(NULL);
+	mnt = debugfs__mount();
 	if (!mnt)
 		return NULL;
 
@@ -90,33 +91,30 @@ static int strerror_open(int err, char *buf, size_t size, const char *filename)
 
 	switch (err) {
 	case ENOENT:
-		if (debugfs_configured()) {
+		/*
+		 * We will get here if we can't find the tracepoint, but one of
+		 * debugfs or tracefs is configured, which means you probably
+		 * want some tracepoint which wasn't compiled in your kernel.
+		 * - jirka
+		 */
+		if (debugfs__configured() || tracefs__configured()) {
 			snprintf(buf, size,
 				 "Error:\tFile %s/%s not found.\n"
 				 "Hint:\tPerhaps this kernel misses some CONFIG_ setting to enable this feature?.\n",
-				 debugfs_mountpoint, filename);
+				 tracing_events_path, filename);
 			break;
 		}
 		snprintf(buf, size, "%s",
-			 "Error:\tUnable to find debugfs\n"
-			 "Hint:\tWas your kernel compiled with debugfs support?\n"
-			 "Hint:\tIs the debugfs filesystem mounted?\n"
+			 "Error:\tUnable to find debugfs/tracefs\n"
+			 "Hint:\tWas your kernel compiled with debugfs/tracefs support?\n"
+			 "Hint:\tIs the debugfs/tracefs filesystem mounted?\n"
 			 "Hint:\tTry 'sudo mount -t debugfs nodev /sys/kernel/debug'");
 		break;
 	case EACCES: {
-		const char *mountpoint = debugfs_mountpoint;
-
-		if (!access(debugfs_mountpoint, R_OK) && strncmp(filename, "tracing/", 8) == 0) {
-			const char *tracefs_mntpoint = tracefs_find_mountpoint();
-
-			if (tracefs_mntpoint)
-				mountpoint = tracefs_mntpoint;
-		}
-
 		snprintf(buf, size,
 			 "Error:\tNo permissions to read %s/%s\n"
 			 "Hint:\tTry 'sudo mount -o remount,mode=755 %s'\n",
-			 debugfs_mountpoint, filename, mountpoint);
+			 tracing_events_path, filename, tracing_mnt);
 	}
 		break;
 	default:
@@ -131,7 +129,7 @@ int tracing_path__strerror_open_tp(int err, char *buf, size_t size, const char *
 {
 	char path[PATH_MAX];
 
-	snprintf(path, PATH_MAX, "tracing/events/%s/%s", sys, name ?: "*");
+	snprintf(path, PATH_MAX, "%s/%s", sys, name ?: "*");
 
 	return strerror_open(err, buf, size, path);
 }

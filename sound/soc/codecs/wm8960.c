@@ -201,7 +201,7 @@ static int wm8960_put_deemph(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct wm8960_priv *wm8960 = snd_soc_codec_get_drvdata(codec);
-	int deemph = ucontrol->value.integer.value[0];
+	unsigned int deemph = ucontrol->value.integer.value[0];
 
 	if (deemph > 1)
 		return -EINVAL;
@@ -240,9 +240,9 @@ SOC_SINGLE_TLV("Left Input Boost Mixer LINPUT3 Volume",
 SOC_SINGLE_TLV("Left Input Boost Mixer LINPUT2 Volume",
 	       WM8960_INBMIX2, 1, 7, 0, lineinboost_tlv),
 SOC_SINGLE_TLV("Right Input Boost Mixer RINPUT1 Volume",
-		WM8960_RINPATH, 4, 4, 0, micboost_tlv),
+		WM8960_RINPATH, 4, 3, 0, micboost_tlv),
 SOC_SINGLE_TLV("Left Input Boost Mixer LINPUT1 Volume",
-		WM8960_LINPATH, 4, 4, 0, micboost_tlv),
+		WM8960_LINPATH, 4, 3, 0, micboost_tlv),
 
 SOC_DOUBLE_R_TLV("Playback Volume", WM8960_LDAC, WM8960_RDAC,
 		 0, 255, 0, dac_tlv),

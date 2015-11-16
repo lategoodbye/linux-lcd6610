@@ -1110,8 +1110,8 @@ static int netlink_insert(struct sock *sk, u32 portid)
 
 	lock_sock(sk);
 
-	err = -EBUSY;
-	if (nlk_sk(sk)->portid)
+	err = nlk_sk(sk)->portid == portid ? 0 : -EBUSY;
+	if (nlk_sk(sk)->bound)
 		goto err;
 
 	err = -ENOMEM;
@@ -1131,9 +1131,13 @@ static int netlink_insert(struct sock *sk, u32 portid)
 			err = -EOVERFLOW;
 		if (err == -EEXIST)
 			err = -EADDRINUSE;
-		nlk_sk(sk)->portid = 0;
 		sock_put(sk);
+		goto err;
 	}
+
+	/* We need to ensure that the socket is hashed and visible. */
+	smp_wmb();
+	nlk_sk(sk)->bound = portid;
 
 err:
 	release_sock(sk);
@@ -1519,6 +1523,7 @@ static int netlink_bind(struct socket *sock, struct sockaddr *addr,
 	struct sockaddr_nl *nladdr = (struct sockaddr_nl *)addr;
 	int err;
 	long unsigned int groups = nladdr->nl_groups;
+	bool bound;
 
 	if (addr_len < sizeof(struct sockaddr_nl))
 		return -EINVAL;
@@ -1535,9 +1540,14 @@ static int netlink_bind(struct socket *sock, struct sockaddr *addr,
 			return err;
 	}
 
-	if (nlk->portid)
+	bound = nlk->bound;
+	if (bound) {
+		/* Ensure nlk->portid is up-to-date. */
+		smp_rmb();
+
 		if (nladdr->nl_pid != nlk->portid)
 			return -EINVAL;
+	}
 
 	if (nlk->netlink_bind && groups) {
 		int group;
@@ -1553,7 +1563,10 @@ static int netlink_bind(struct socket *sock, struct sockaddr *addr,
 		}
 	}
 
-	if (!nlk->portid) {
+	/* No need for barriers here as we return to user-space without
+	 * using any of the bound attributes.
+	 */
+	if (!bound) {
 		err = nladdr->nl_pid ?
 			netlink_insert(sk, nladdr->nl_pid) :
 			netlink_autobind(sock);
@@ -1601,7 +1614,10 @@ static int netlink_connect(struct socket *sock, struct sockaddr *addr,
 	    !netlink_allowed(sock, NL_CFG_F_NONROOT_SEND))
 		return -EPERM;
 
-	if (!nlk->portid)
+	/* No need for barriers here as we return to user-space without
+	 * using any of the bound attributes.
+	 */
+	if (!nlk->bound)
 		err = netlink_autobind(sock);
 
 	if (err == 0) {
@@ -2100,7 +2116,7 @@ int netlink_broadcast_filtered(struct sock *ssk, struct sk_buff *skb, u32 portid
 	consume_skb(info.skb2);
 
 	if (info.delivered) {
-		if (info.congested && (allocation & __GFP_WAIT))
+		if (info.congested && gfpflags_allow_blocking(allocation))
 			yield();
 		return 0;
 	}
@@ -2355,7 +2371,7 @@ static int netlink_getsockopt(struct socket *sock, int level, int optname,
 		int pos, idx, shift;
 
 		err = 0;
-		netlink_table_grab();
+		netlink_lock_table();
 		for (pos = 0; pos * 8 < nlk->ngroups; pos += sizeof(u32)) {
 			if (len - pos < sizeof(u32))
 				break;
@@ -2370,7 +2386,7 @@ static int netlink_getsockopt(struct socket *sock, int level, int optname,
 		}
 		if (put_user(ALIGN(nlk->ngroups / 8, sizeof(u32)), optlen))
 			err = -EFAULT;
-		netlink_table_ungrab();
+		netlink_unlock_table();
 		break;
 	}
 	case NETLINK_CAP_ACK:
@@ -2442,10 +2458,13 @@ static int netlink_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 		dst_group = nlk->dst_group;
 	}
 
-	if (!nlk->portid) {
+	if (!nlk->bound) {
 		err = netlink_autobind(sock);
 		if (err)
 			goto out;
+	} else {
+		/* Ensure nlk is hashed and visible. */
+		smp_rmb();
 	}
 
 	/* It's a really convoluted way for userland to ask for mmaped
@@ -2766,6 +2785,7 @@ static int netlink_dump(struct sock *sk)
 	struct sk_buff *skb = NULL;
 	struct nlmsghdr *nlh;
 	int len, err = -ENOBUFS;
+	int alloc_min_size;
 	int alloc_size;
 
 	mutex_lock(nlk->cb_mutex);
@@ -2773,9 +2793,6 @@ static int netlink_dump(struct sock *sk)
 		err = -EINVAL;
 		goto errout_skb;
 	}
-
-	cb = &nlk->cb;
-	alloc_size = max_t(int, cb->min_dump_alloc, NLMSG_GOODSIZE);
 
 	if (!netlink_rx_is_mmaped(sk) &&
 	    atomic_read(&sk->sk_rmem_alloc) >= sk->sk_rcvbuf)
@@ -2786,23 +2803,35 @@ static int netlink_dump(struct sock *sk)
 	 * to reduce number of system calls on dump operations, if user
 	 * ever provided a big enough buffer.
 	 */
-	if (alloc_size < nlk->max_recvmsg_len) {
-		skb = netlink_alloc_skb(sk,
-					nlk->max_recvmsg_len,
-					nlk->portid,
+	cb = &nlk->cb;
+	alloc_min_size = max_t(int, cb->min_dump_alloc, NLMSG_GOODSIZE);
+
+	if (alloc_min_size < nlk->max_recvmsg_len) {
+		alloc_size = nlk->max_recvmsg_len;
+		skb = netlink_alloc_skb(sk, alloc_size, nlk->portid,
 					GFP_KERNEL |
 					__GFP_NOWARN |
 					__GFP_NORETRY);
-		/* available room should be exact amount to avoid MSG_TRUNC */
-		if (skb)
-			skb_reserve(skb, skb_tailroom(skb) -
-					 nlk->max_recvmsg_len);
 	}
-	if (!skb)
+	if (!skb) {
+		alloc_size = alloc_min_size;
 		skb = netlink_alloc_skb(sk, alloc_size, nlk->portid,
 					GFP_KERNEL);
+	}
 	if (!skb)
 		goto errout_skb;
+
+	/* Trim skb to allocated size. User is expected to provide buffer as
+	 * large as max(min_dump_alloc, 16KiB (mac_recvmsg_len capped at
+	 * netlink_recvmsg())). dump will pack as many smaller messages as
+	 * could fit within the allocated skb. skb is typically allocated
+	 * with larger space than required (could be as much as near 2x the
+	 * requested size with align to next power of 2 approach). Allowing
+	 * dump to use the excess space makes it difficult for a user to have a
+	 * reasonable static buffer based on the expected largest dump of a
+	 * single netdev. The outcome is MSG_TRUNC error.
+	 */
+	skb_reserve(skb, skb_tailroom(skb) - alloc_size);
 	netlink_skb_set_owner_r(skb, sk);
 
 	len = cb->dump(skb, cb);

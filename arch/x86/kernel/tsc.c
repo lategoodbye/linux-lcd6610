@@ -21,6 +21,7 @@
 #include <asm/hypervisor.h>
 #include <asm/nmi.h>
 #include <asm/x86_init.h>
+#include <asm/geode.h>
 
 unsigned int __read_mostly cpu_khz;	/* TSC clocks / usec, not used here */
 EXPORT_SYMBOL(cpu_khz);
@@ -257,6 +258,17 @@ static void set_cyc2ns_scale(unsigned long cpu_khz, int cpu)
 	 */
 	clocks_calc_mult_shift(&data->cyc2ns_mul, &data->cyc2ns_shift, cpu_khz,
 			       NSEC_PER_MSEC, 0);
+
+	/*
+	 * cyc2ns_shift is exported via arch_perf_update_userpage() where it is
+	 * not expected to be greater than 31 due to the original published
+	 * conversion algorithm shifting a 32-bit value (now specifies a 64-bit
+	 * value) - refer perf_event_mmap_page documentation in perf_event.h.
+	 */
+	if (data->cyc2ns_shift == 32) {
+		data->cyc2ns_shift = 31;
+		data->cyc2ns_mul >>= 1;
+	}
 
 	data->cyc2ns_offset = ns_now -
 		mul_u64_u32_shr(tsc_now, data->cyc2ns_mul, data->cyc2ns_shift);
@@ -1011,15 +1023,17 @@ EXPORT_SYMBOL_GPL(mark_tsc_unstable);
 
 static void __init check_system_tsc_reliable(void)
 {
-#ifdef CONFIG_MGEODE_LX
-	/* RTSC counts during suspend */
+#if defined(CONFIG_MGEODEGX1) || defined(CONFIG_MGEODE_LX) || defined(CONFIG_X86_GENERIC)
+	if (is_geode_lx()) {
+		/* RTSC counts during suspend */
 #define RTSC_SUSP 0x100
-	unsigned long res_low, res_high;
+		unsigned long res_low, res_high;
 
-	rdmsr_safe(MSR_GEODE_BUSCONT_CONF0, &res_low, &res_high);
-	/* Geode_LX - the OLPC CPU has a very reliable TSC */
-	if (res_low & RTSC_SUSP)
-		tsc_clocksource_reliable = 1;
+		rdmsr_safe(MSR_GEODE_BUSCONT_CONF0, &res_low, &res_high);
+		/* Geode_LX - the OLPC CPU has a very reliable TSC */
+		if (res_low & RTSC_SUSP)
+			tsc_clocksource_reliable = 1;
+	}
 #endif
 	if (boot_cpu_has(X86_FEATURE_TSC_RELIABLE))
 		tsc_clocksource_reliable = 1;

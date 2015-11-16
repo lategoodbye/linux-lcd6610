@@ -25,8 +25,6 @@ static void register_onboard_backlight(struct fbtft_par *par);
 
 static int init_display(struct fbtft_par *par)
 {
-	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
-
 	if (par->pdata
 		&& par->pdata->display.backlight == FBTFT_ONBOARD_BACKLIGHT) {
 		/* module uses onboard GPIO for panel power */
@@ -70,8 +68,6 @@ static int set_var(struct fbtft_par *par)
 {
 	unsigned remap;
 
-	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
-
 	if (par->fbtftops.init_display != init_display) {
 		/* don't risk messing up register A0h */
 		fbtft_par_dbg(DEBUG_INIT_DISPLAY, par,
@@ -101,32 +97,30 @@ static int set_var(struct fbtft_par *par)
 }
 
 /*
-	Grayscale Lookup Table
-	GS1 - GS63
-	The driver Gamma curve contains the relative values between the entries
-	in the Lookup table.
-
-	From datasheet:
-	8.8 Gray Scale Decoder
-
-		there are total 180 Gamma Settings (Setting 0 to Setting 180)
-		available for the Gray Scale table.
-
-		The gray scale is defined in incremental way, with reference
-		to the length of previous table entry:
-			Setting of GS1 has to be >= 0
-			Setting of GS2 has to be > Setting of GS1 +1
-			Setting of GS3 has to be > Setting of GS2 +1
-			:
-			Setting of GS63 has to be > Setting of GS62 +1
-
-*/
+ * Grayscale Lookup Table
+ * GS1 - GS63
+ * The driver Gamma curve contains the relative values between the entries
+ * in the Lookup table.
+ *
+ * From datasheet:
+ * 8.8 Gray Scale Decoder
+ *
+ *	there are total 180 Gamma Settings (Setting 0 to Setting 180)
+ *	available for the Gray Scale table.
+ *
+ *	The gray scale is defined in incremental way, with reference
+ *	to the length of previous table entry:
+ *		Setting of GS1 has to be >= 0
+ *		Setting of GS2 has to be > Setting of GS1 +1
+ *		Setting of GS3 has to be > Setting of GS2 +1
+ *		:
+ *		Setting of GS63 has to be > Setting of GS62 +1
+ *
+ */
 static int set_gamma(struct fbtft_par *par, unsigned long *curves)
 {
 	unsigned long tmp[GAMMA_NUM * GAMMA_LEN];
 	int i, acc = 0;
-
-	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
 
 	for (i = 0; i < 63; i++) {
 		if (i > 0 && curves[i] < 2) {
@@ -211,8 +205,6 @@ static void register_onboard_backlight(struct fbtft_par *par)
 {
 	struct backlight_device *bd;
 	struct backlight_properties bl_props = { 0, };
-
-	fbtft_par_dbg(DEBUG_BACKLIGHT, par, "%s()\n", __func__);
 
 	bl_props.type = BACKLIGHT_RAW;
 	bl_props.power = FB_BLANK_POWERDOWN;

@@ -438,7 +438,7 @@ static ssize_t ade7754_write_frequency(struct device *dev,
 	ret = kstrtou16(buf, 10, &val);
 	if (ret)
 		return ret;
-	if (val == 0)
+	if (!val)
 		return -EINVAL;
 
 	mutex_lock(&indio_dev->mlock);
@@ -575,7 +575,6 @@ static int ade7754_remove(struct spi_device *spi)
 static struct spi_driver ade7754_driver = {
 	.driver = {
 		.name = "ade7754",
-		.owner = THIS_MODULE,
 	},
 	.probe = ade7754_probe,
 	.remove = ade7754_remove,

@@ -18,7 +18,8 @@
 
 #define pr_fmt(fmt) "ashmem: " fmt
 
-#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/export.h>
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/falloc.h>
@@ -43,7 +44,7 @@
  * @unpinned_list:	The list of all ashmem areas
  * @file:		The shmem-based backing file
  * @size:		The size of the mapping, in bytes
- * @prot_masks:		The allowed protection bits, as vm_flags
+ * @prot_mask:		The allowed protection bits, as vm_flags
  *
  * The lifecycle of this structure is from our parent file's open() until
  * its release(). It is also protected by 'ashmem_mutex'
@@ -82,14 +83,14 @@ struct ashmem_range {
 /* LRU list of unpinned pages, protected by ashmem_mutex */
 static LIST_HEAD(ashmem_lru_list);
 
-/**
+/*
  * long lru_count - The count of pages on our LRU list.
  *
  * This is protected by ashmem_mutex.
  */
 static unsigned long lru_count;
 
-/**
+/*
  * ashmem_mutex - protects the list of and each individual ashmem_area
  *
  * Lock Ordering: ashmex_mutex -> i_mutex -> i_alloc_sem
@@ -860,19 +861,4 @@ static int __init ashmem_init(void)
 
 	return 0;
 }
-
-static void __exit ashmem_exit(void)
-{
-	unregister_shrinker(&ashmem_shrinker);
-
-	misc_deregister(&ashmem_misc);
-	kmem_cache_destroy(ashmem_range_cachep);
-	kmem_cache_destroy(ashmem_area_cachep);
-
-	pr_info("unloaded\n");
-}
-
-module_init(ashmem_init);
-module_exit(ashmem_exit);
-
-MODULE_LICENSE("GPL");
+device_initcall(ashmem_init);

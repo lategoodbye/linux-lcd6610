@@ -246,7 +246,7 @@ struct fbtft_par {
 	} gamma;
 	unsigned long debug;
 	bool first_update_done;
-	struct timespec update_time;
+	ktime_t update_time;
 	bool bgr;
 	void *extra;
 };
@@ -327,7 +327,6 @@ MODULE_DEVICE_TABLE(of, dt_ids);                                           \
 static struct spi_driver fbtft_driver_spi_driver = {                       \
 	.driver = {                                                        \
 		.name   = _name,                                           \
-		.owner  = THIS_MODULE,                                     \
 		.of_match_table = of_match_ptr(dt_ids),                    \
 	},                                                                 \
 	.probe  = fbtft_driver_probe_spi,                                  \

@@ -37,7 +37,6 @@
 #include "util/strfilter.h"
 #include "util/symbol.h"
 #include "util/debug.h"
-#include <api/fs/debugfs.h>
 #include "util/parse-options.h"
 #include "util/probe-finder.h"
 #include "util/probe-event.h"
@@ -183,10 +182,8 @@ static int opt_set_target(const struct option *opt, const char *str,
 	if  (str) {
 		if (!strcmp(opt->long_name, "exec"))
 			params.uprobes = true;
-#ifdef HAVE_DWARF_SUPPORT
 		else if (!strcmp(opt->long_name, "module"))
 			params.uprobes = false;
-#endif
 		else
 			return ret;
 
@@ -318,6 +315,10 @@ static int perf_add_probe_events(struct perf_probe_event *pevs, int npevs)
 	int i, k;
 	const char *event = NULL, *group = NULL;
 
+	ret = init_probe_symbol_maps(pevs->uprobes);
+	if (ret < 0)
+		return ret;
+
 	ret = convert_perf_probe_events(pevs, npevs);
 	if (ret < 0)
 		goto out_cleanup;
@@ -355,6 +356,7 @@ static int perf_add_probe_events(struct perf_probe_event *pevs, int npevs)
 
 out_cleanup:
 	cleanup_perf_probe_events(pevs, npevs);
+	exit_probe_symbol_maps();
 	return ret;
 }
 
@@ -376,8 +378,11 @@ static int perf_del_probe_events(struct strfilter *filter)
 		goto out;
 
 	klist = strlist__new(NULL, NULL);
-	if (!klist)
-		return -ENOMEM;
+	ulist = strlist__new(NULL, NULL);
+	if (!klist || !ulist) {
+		ret = -ENOMEM;
+		goto out;
+	}
 
 	ret = probe_file__get_events(kfd, filter, klist);
 	if (ret == 0) {
@@ -483,9 +488,6 @@ __cmd_probe(int argc, const char **argv, const char *prefix __maybe_unused)
 		   "file", "vmlinux pathname"),
 	OPT_STRING('s', "source", &symbol_conf.source_prefix,
 		   "directory", "path to kernel source"),
-	OPT_CALLBACK('m', "module", NULL, "modname|path",
-		"target module name (for online) or path (for offline)",
-		opt_set_target),
 	OPT_BOOLEAN('\0', "no-inlines", &probe_conf.no_inlines,
 		"Don't search inlined functions"),
 #endif
@@ -502,6 +504,9 @@ __cmd_probe(int argc, const char **argv, const char *prefix __maybe_unused)
 		     opt_set_filter),
 	OPT_CALLBACK('x', "exec", NULL, "executable|path",
 			"target executable name or path", opt_set_target),
+	OPT_CALLBACK('m', "module", NULL, "modname|path",
+		"target module name (for online) or path (for offline)",
+		opt_set_target),
 	OPT_BOOLEAN(0, "demangle", &symbol_conf.demangle,
 		    "Enable symbol demangling"),
 	OPT_BOOLEAN(0, "demangle-kernel", &symbol_conf.demangle_kernel,
@@ -523,12 +528,12 @@ __cmd_probe(int argc, const char **argv, const char *prefix __maybe_unused)
 			     PARSE_OPT_STOP_AT_NON_OPTION);
 	if (argc > 0) {
 		if (strcmp(argv[0], "-") == 0) {
-			pr_warning("  Error: '-' is not supported.\n");
-			usage_with_options(probe_usage, options);
+			usage_with_options_msg(probe_usage, options,
+				"'-' is not supported.\n");
 		}
 		if (params.command && params.command != 'a') {
-			pr_warning("  Error: another command except --add is set.\n");
-			usage_with_options(probe_usage, options);
+			usage_with_options_msg(probe_usage, options,
+				"another command except --add is set.\n");
 		}
 		ret = parse_probe_event_argv(argc, argv);
 		if (ret < 0) {
@@ -557,8 +562,10 @@ __cmd_probe(int argc, const char **argv, const char *prefix __maybe_unused)
 	switch (params.command) {
 	case 'l':
 		if (params.uprobes) {
-			pr_warning("  Error: Don't use --list with --exec.\n");
-			usage_with_options(probe_usage, options);
+			pr_err("  Error: Don't use --list with --exec.\n");
+			parse_options_usage(probe_usage, options, "l", true);
+			parse_options_usage(NULL, options, "x", true);
+			return -EINVAL;
 		}
 		ret = show_perf_probe_events(params.filter);
 		if (ret < 0)
@@ -598,8 +605,10 @@ __cmd_probe(int argc, const char **argv, const char *prefix __maybe_unused)
 	case 'a':
 		/* Ensure the last given target is used */
 		if (params.target && !params.target_used) {
-			pr_warning("  Error: -x/-m must follow the probe definitions.\n");
-			usage_with_options(probe_usage, options);
+			pr_err("  Error: -x/-m must follow the probe definitions.\n");
+			parse_options_usage(probe_usage, options, "m", true);
+			parse_options_usage(NULL, options, "x", true);
+			return -EINVAL;
 		}
 
 		ret = perf_add_probe_events(params.events, params.nevents);
