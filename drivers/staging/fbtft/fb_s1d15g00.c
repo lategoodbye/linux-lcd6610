@@ -74,7 +74,7 @@ MODULE_PARM_DESC(alpha, "Voltage regulator volume value alpha: 0-63 (default: 32
 /* 12 bit pixel over 9-bit SPI bus: dc + high byte, dc + low byte */
 int write_vmem16_bus9(struct fbtft_par *par, size_t offset, size_t len)
 {
-	u16 *vmem16 = (u16 *)(par->info->screen_base + offset);
+	u16 *vmem16 = (u16 *)(par->info->screen_buffer + offset);
 	u16 *txbuf16 = par->txbuf.buf;
 	size_t buf_len;
 	size_t tx_array_size;
