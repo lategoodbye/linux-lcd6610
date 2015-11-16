@@ -71,8 +71,8 @@ static short alpha = 32;
 module_param(alpha, short, 0);
 MODULE_PARM_DESC(alpha, "Voltage regulator volume value alpha: 0-63 (default: 32)");
 
-/* 12 bit pixel over 9-bit SPI bus: dc + high byte, dc + low byte */
-int write_vmem16_bus9(struct fbtft_par *par, size_t offset, size_t len)
+/* 12 bit pixel over 9-bit SPI bus */
+static int write_vmem12_bus9(struct fbtft_par *par, size_t offset, size_t len)
 {
 	u16 *vmem16 = (u16 *)(par->info->screen_buffer + offset);
 	u16 *txbuf16 = par->txbuf.buf;
@@ -203,7 +203,7 @@ static struct fbtft_display display = {
 	.width = WIDTH,
 	.height = HEIGHT,
 	.fbtftops = {
-		.write_vmem = write_vmem16_bus9,
+		.write_vmem = write_vmem12_bus9,
 		.init_display = init_display,
 		.set_addr_win = set_addr_win,
 		.set_var = set_var,
