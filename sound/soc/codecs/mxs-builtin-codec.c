@@ -28,8 +28,10 @@
 #define BF(value, field) (((value) << BP_##field) & BM_##field)
 #endif
 
-/* TODO Delete this and use BM_RTC_PERSISTENT0_RELEASE_GND from header file
- * if it works. */
+/*
+ * TODO Delete this and use BM_RTC_PERSISTENT0_RELEASE_GND from header file
+ * if it works.
+ */
 #define BP_RTC_PERSISTENT0_SPARE_ANALOG	18
 #define BM_RTC_PERSISTENT0_SPARE_ANALOG	0xFFFC0000
 #define BM_RTC_PERSISTENT0_RELEASE_GND BF(0x2, RTC_PERSISTENT0_SPARE_ANALOG)
@@ -130,6 +132,7 @@ static inline int get_srr_values(int rate)
 static void mxs_codec_write_cache(struct snd_soc_codec *codec, unsigned int reg, unsigned int value)
 {
 	u16 *cache = codec->reg_cache;
+
 	if (reg < ADC_REGNUM)
 		cache[reg] = value;
 }
@@ -172,34 +175,36 @@ static unsigned int mxs_codec_read(struct snd_soc_codec *codec, unsigned int reg
 	return reg_val & 0xffff;
 }
 
-// static unsigned int mxs_codec_read_cache(struct snd_soc_codec *codec, unsigned int reg)
-// {
-// 	u16 *cache = codec->reg_cache;
-// 	if (reg >= ADC_REGNUM)
-// 		return -EINVAL;
-// 	return cache[reg];
-// }
+/* static unsigned int mxs_codec_read_cache(struct snd_soc_codec *codec, unsigned int reg)
+{
+	u16 *cache = codec->reg_cache;
+	if (reg >= ADC_REGNUM)
+		return -EINVAL;
+	return cache[reg];
+} */
 
 static void mxs_codec_sync_reg_cache(struct snd_soc_codec *codec)
 {
 	int reg;
+
 	for (reg = 0; reg < ADC_REGNUM; reg += 1)
 		mxs_codec_write_cache(codec, reg,
 					   mxs_codec_read(codec, reg));
 }
 
-// static int mxs_codec_restore_reg(struct snd_soc_codec *codec, unsigned int reg)
-// {
-// 	unsigned int cached_val, hw_val;
-//
-// 	cached_val = mxs_codec_read_cache(codec, reg);
-// 	hw_val = mxs_codec_read(codec, reg);
-//
-// 	if (hw_val != cached_val)
-// 		return mxs_codec_write(codec, reg, cached_val);
-//
-// 	return 0;
-// }
+/* static int mxs_codec_restore_reg(struct snd_soc_codec *codec, unsigned int reg)
+{
+	unsigned int cached_val, hw_val;
+
+	cached_val = mxs_codec_read_cache(codec, reg);
+	hw_val = mxs_codec_read(codec, reg);
+
+	if (hw_val != cached_val)
+		return mxs_codec_write(codec, reg, cached_val);
+
+	return 0;
+}
+ */
 /* END SoC IO functions */
 
 /* Codec routines */
@@ -595,10 +600,10 @@ static int dac_put_volsw(struct snd_kcontrol *kcontrol,
 	int reg, l, r;
 	int i;
 
-	/* 
-         * During probe the driver data could be NULL, because of a
-         * race condition. So avoid a NULL pointer dereference here.
-         */
+	/*
+	 * During probe the driver data could be NULL, because of a
+	 * race condition. So avoid a NULL pointer dereference here.
+	 */
 	if (!mxs_adc)
 		return -EAGAIN;
 
@@ -892,8 +897,7 @@ static int mxs_codec_dig_mute(struct snd_soc_dai *codec_dai, int mute)
 	    BM_AUDIOOUT_DACVOLUME_MUTE_RIGHT;
 
 	if (mute) {
-		reg = __raw_readl(mxs_adc->aout_base + \
-				HW_AUDIOOUT_DACVOLUME);
+		reg = __raw_readl(mxs_adc->aout_base + HW_AUDIOOUT_DACVOLUME);
 
 		reg1 = reg & ~BM_AUDIOOUT_DACVOLUME_VOLUME_LEFT;
 		reg1 = reg1 & ~BM_AUDIOOUT_DACVOLUME_VOLUME_RIGHT;
@@ -986,29 +990,31 @@ static int mxs_codec_driver_remove(struct snd_soc_codec *codec)
 	return 0;
 }
 
-// static int mxs_codec_driver_suspend(struct snd_soc_codec *codec)
-// {
-// 	/* TODO Enable power management. */
-// 	return 0;
-// }
+/* TODO Enable power management.
+static int mxs_codec_driver_suspend(struct snd_soc_codec *codec)
+{
+	return 0;
+}
 
-// static int mxs_codec_driver_resume(struct snd_soc_codec *codec)
-// {
-// 	/* TODO Enable power management. */
-// 	return 0;
-// }
+static int mxs_codec_driver_resume(struct snd_soc_codec *codec)
+{
+
+	return 0;
+} */
 
 static struct snd_soc_codec_driver mxs_codec_driver = {
 	.probe = mxs_codec_driver_probe,
 	.remove = mxs_codec_driver_remove,
-// 	.suspend = mxs_codec_driver_suspend,
-// 	.resume = mxs_codec_driver_resume,
+/* 	.suspend = mxs_codec_driver_suspend,
+	.resume = mxs_codec_driver_resume,
+ */
 	.set_bias_level = mxs_set_bias_level,
 	.reg_cache_size = ADC_REGNUM,
 	.reg_word_size = sizeof(u16),
 	.reg_cache_step = 1,
-// 	.reg_cache_default = mxsadc_regs,
-// 	.volatile_register = sgtl5000_volatile_register,
+/*	.reg_cache_default = mxsadc_regs,
+	.volatile_register = sgtl5000_volatile_register,
+ */
 	.controls = mxs_snd_controls,
 	.num_controls = ARRAY_SIZE(mxs_snd_controls),
 	.dapm_widgets = mxs_dapm_widgets,
@@ -1087,8 +1093,8 @@ static int mxs_adc_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ret = snd_soc_register_codec(&pdev->dev,
-			&mxs_codec_driver,&mxs_codec_dai_driver, 1);
+	ret = snd_soc_register_codec(&pdev->dev, &mxs_codec_driver,
+				     &mxs_codec_dai_driver, 1);
 	if (ret) {
 		dev_err(&pdev->dev, "Codec registration failed: %d\n", ret);
 		goto disable_clk;

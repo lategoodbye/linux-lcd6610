@@ -45,13 +45,19 @@ static int mxsadc_audio_probe_dt(struct platform_device *pdev)
 	int ret = 0;
 
 	if (!np)
-		return 1; /* no device tree */
+		return -ENODEV;
 
 	cpu_dai_np = of_parse_phandle(np, "cpu-dai", 0);
-	codec_np = of_parse_phandle(np, "audio-codec", 0);
-	if (!cpu_dai_np || !codec_np) {
-		dev_err(&pdev->dev, "phandle missing or invalid\n");
+	if (!cpu_dai_np) {
+		dev_err(&pdev->dev, "invalid phandle: cpu-dai\n");
 		return -EINVAL;
+	}
+
+	codec_np = of_parse_phandle(np, "audio-codec", 0);
+	if (!codec_np) {
+		dev_err(&pdev->dev, "invalid phandle: audio-codec\n");
+		ret = -EINVAL;
+		goto free_cpu_dai;
 	}
 
 	mxs_adc_dai_link[0].codec_name = NULL;
@@ -62,6 +68,7 @@ static int mxsadc_audio_probe_dt(struct platform_device *pdev)
 	mxs_adc_dai_link[0].platform_of_node = cpu_dai_np;
 
 	of_node_put(codec_np);
+free_cpu_dai:
 	of_node_put(cpu_dai_np);
 
 	return ret;

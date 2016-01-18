@@ -46,7 +46,7 @@ struct mxs_adc_priv {
 	void __iomem *rtc_base;
 };
 
-typedef struct {
+struct mxs_delayed_work {
 	struct work_struct work;
 	struct timer_list timer;
 
@@ -55,16 +55,12 @@ typedef struct {
 	int cpu;
 
 	struct mxs_adc_priv *mxs_adc;
-} my_delayed_work_t;
+};
 
-// static struct delayed_work work;
-// static struct delayed_work adc_ramp_work;
-// static struct delayed_work dac_ramp_work;
-// static struct delayed_work test;
-static my_delayed_work_t work;
-static my_delayed_work_t adc_ramp_work;
-static my_delayed_work_t dac_ramp_work;
-static my_delayed_work_t test;
+static struct mxs_delayed_work work;
+static struct mxs_delayed_work adc_ramp_work;
+static struct mxs_delayed_work dac_ramp_work;
+static struct mxs_delayed_work test;
 static bool adc_ramp_done = 1;
 static bool dac_ramp_done = 1;
 
@@ -75,7 +71,8 @@ static inline void mxs_adc_schedule_work(struct delayed_work *work)
 
 static void mxs_adc_work(struct work_struct *work)
 {
-	struct mxs_adc_priv *mxs_adc = ((my_delayed_work_t *)work)->mxs_adc;
+	struct mxs_delayed_work *w = container_of(work, struct mxs_delayed_work, work);
+	struct mxs_adc_priv *mxs_adc = w->mxs_adc;
 	/* disable irq */
 	disable_irq(mxs_adc->hp_short_irq);
 
@@ -96,9 +93,9 @@ static void mxs_adc_work(struct work_struct *work)
 
 			__raw_writel(BM_AUDIOOUT_PWRDN_HEADPHONE,
 				mxs_adc->audioout_base + HW_AUDIOOUT_PWRDN_SET);
-			printk(KERN_WARNING "WARNING : Headphone LR short!\r\n");
+			pr_warn("Headphone LR short!\r\n");
 		} else {
-			printk(KERN_WARNING "INFO : Headphone LR no longer short!\r\n");
+			pr_info("Headphone LR no longer short!\r\n");
 			break;
 		}
 		/* uninterruptible sleep for ~ 1 sec */
@@ -123,7 +120,8 @@ static void mxs_adc_schedule_ramp_work(struct delayed_work *work)
 
 static void mxs_adc_ramp_work(struct work_struct *work)
 {
-	struct mxs_adc_priv *mxs_adc = ((my_delayed_work_t *)work)->mxs_adc;
+	struct mxs_delayed_work *w = container_of(work, struct mxs_delayed_work, work);
+	struct mxs_adc_priv *mxs_adc = w->mxs_adc;
 	u32 reg = 0;
 	u32 reg1 = 0;
 	u32 reg2 = 0;
@@ -131,8 +129,7 @@ static void mxs_adc_ramp_work(struct work_struct *work)
 	u32 ll, rr;
 	int i;
 
-	reg = __raw_readl(mxs_adc->audioin_base + \
-		HW_AUDIOIN_ADCVOLUME);
+	reg = __raw_readl(mxs_adc->audioin_base + HW_AUDIOIN_ADCVOLUME);
 
 	reg1 = reg & ~BM_AUDIOIN_ADCVOLUME_VOLUME_LEFT;
 	reg1 = reg1 & ~BM_AUDIOIN_ADCVOLUME_VOLUME_RIGHT;
@@ -176,7 +173,8 @@ static void mxs_dac_schedule_ramp_work(struct delayed_work *work)
 
 static void mxs_dac_ramp_work(struct work_struct *work)
 {
-	struct mxs_adc_priv *mxs_adc = ((my_delayed_work_t *)work)->mxs_adc;
+	struct mxs_delayed_work *w = container_of(work, struct mxs_delayed_work, work);
+	struct mxs_adc_priv *mxs_adc = w->mxs_adc;
 	u32 reg = 0;
 	u32 reg1 = 0;
 	u32 l, r;
@@ -189,8 +187,7 @@ static void mxs_dac_ramp_work(struct work_struct *work)
 	__raw_writel(BM_AUDIOOUT_SPEAKERCTRL_MUTE,
 		mxs_adc->audioout_base + HW_AUDIOOUT_SPEAKERCTRL_CLR);
 
-	reg = __raw_readl(mxs_adc->audioout_base + \
-			HW_AUDIOOUT_HPVOL);
+	reg = __raw_readl(mxs_adc->audioout_base + HW_AUDIOOUT_HPVOL);
 
 	reg1 = reg & ~BM_AUDIOOUT_HPVOL_VOL_LEFT;
 	reg1 = reg1 & ~BM_AUDIOOUT_HPVOL_VOL_RIGHT;
@@ -219,7 +216,7 @@ static void mxs_dac_ramp_work(struct work_struct *work)
 static irqreturn_t mxs_short_irq(int irq, void *dev_id)
 {
 	struct mxs_adc_priv *mxs_adc = dev_id;
-	//struct snd_pcm_substream *substream = mxs_adc->irq_data.substream;
+	/* struct snd_pcm_substream *substream = mxs_adc->irq_data.substream; */
 
 	__raw_writel(BM_AUDIOOUT_ANACTRL_SHORTMODE_LR,
 		mxs_adc->audioout_base + HW_AUDIOOUT_ANACTRL_CLR);
@@ -261,8 +258,7 @@ static irqreturn_t mxs_err_irq(int irq, void *dev_id)
 	}
 
 	if (ctrl_reg & underflow_mask) {
-		printk(KERN_DEBUG "%s underflow detected\n",
-		       playback ? "DAC" : "ADC");
+		pr_debug("%s underflow detected\n", playback ? "DAC" : "ADC");
 
 		if (playback)
 			__raw_writel(
@@ -274,8 +270,7 @@ static irqreturn_t mxs_err_irq(int irq, void *dev_id)
 				mxs_adc->audioin_base + HW_AUDIOIN_CTRL_CLR);
 
 	} else if (ctrl_reg & overflow_mask) {
-		printk(KERN_DEBUG "%s overflow detected\n",
-		       playback ? "DAC" : "ADC");
+		pr_debug("%s overflow detected\n", playback ? "DAC" : "ADC");
 
 		if (playback)
 			__raw_writel(
@@ -285,7 +280,7 @@ static irqreturn_t mxs_err_irq(int irq, void *dev_id)
 			__raw_writel(BM_AUDIOIN_CTRL_FIFO_OVERFLOW_IRQ,
 				mxs_adc->audioin_base + HW_AUDIOIN_CTRL_CLR);
 	} else
-		printk(KERN_WARNING "Unknown DAC error interrupt\n");
+		pr_debug("Unknown DAC error interrupt\n");
 
 	return IRQ_HANDLED;
 }
@@ -343,10 +338,10 @@ static int mxs_trigger(struct snd_pcm_substream *substream,
 // 			printk(KERN_INFO "vol:%x\n", __raw_readl(mxs_adc->audioout_base + HW_AUDIOOUT_DACVOLUME));
 // 			printk(KERN_INFO "debug:%x\n", __raw_readl(mxs_adc->audioout_base + HW_AUDIOOUT_DACDEBUG));
 // 			printk(KERN_INFO "hpvol:%x\n", __raw_readl(mxs_adc->audioout_base + HW_AUDIOOUT_HPVOL));
-// 			printk(KERN_INFO "pwrdn:%x\n", __raw_readl(mxs_adc->audioout_base + HW_AUDIOOUT_PWRDN));
-// 			printk(KERN_INFO "refc:%x\n", __raw_readl(mxs_adc->audioout_base + HW_AUDIOOUT_REFCTRL));
+//			printk(KERN_INFO "pwrdn:%x\n", __raw_readl(mxs_adc->audioout_base + HW_AUDIOOUT_PWRDN));
+//			printk(KERN_INFO "refc:%x\n", __raw_readl(mxs_adc->audioout_base + HW_AUDIOOUT_REFCTRL));
 // 			printk(KERN_INFO "anac:%x\n", __raw_readl(mxs_adc->audioout_base + HW_AUDIOOUT_ANACTRL));
-// 			printk(KERN_INFO "test:%x\n", __raw_readl(mxs_adc->audioout_base + HW_AUDIOOUT_TEST));
+//			printk(KERN_INFO "test:%x\n", __raw_readl(mxs_adc->audioout_base + HW_AUDIOOUT_TEST));
 // 			printk(KERN_INFO "bist:%x\n", __raw_readl(mxs_adc->audioout_base + HW_AUDIOOUT_BISTCTRL));
 // 			printk(KERN_INFO "anaclk:%x\n", __raw_readl(mxs_adc->audioout_base + HW_AUDIOOUT_ANACLKCTRL));
 
@@ -454,7 +449,7 @@ static const struct snd_soc_dai_ops mxs_adc_dai_ops = {
 
 static int mxs_dai_probe(struct snd_soc_dai *dai)
 {
-	// TODO This does not make any sense.
+	/* TODO This does not make any sense. */
 	struct mxs_adc_priv *mxs_adc = dev_get_drvdata(dai->dev);
 
 	snd_soc_dai_set_drvdata(dai, mxs_adc);
@@ -481,7 +476,7 @@ static struct snd_soc_dai_driver mxs_adc_dai = {
 };
 
 static const struct snd_soc_component_driver mxs_adc_component = {
-	.name		= "mxs-xxx",	//TODO change this name
+	.name		= "mxs-xxx",	/* TODO change this name */
 };
 
 static int mxs_adc_probe(struct platform_device *pdev)
@@ -559,7 +554,7 @@ static int mxs_adc_probe(struct platform_device *pdev)
 			  &mxs_adc->adc_err_irq_data);
 	if (ret) {
 		dev_err(&pdev->dev, "Unable to request ADC/DAC error irq %d\n",
-		        mxs_adc->dma_adc_err_irq);
+			mxs_adc->dma_adc_err_irq);
 		return ret;
 	}
 
@@ -567,7 +562,7 @@ static int mxs_adc_probe(struct platform_device *pdev)
 			  &mxs_adc->dac_err_irq_data);
 	if (ret) {
 		dev_err(&pdev->dev, "Unable to request ADC/DAC error irq %d\n",
-		        mxs_adc->dma_dac_err_irq);
+			mxs_adc->dma_dac_err_irq);
 		return ret;
 	}
 
@@ -575,7 +570,7 @@ static int mxs_adc_probe(struct platform_device *pdev)
 		IRQF_SHARED, "MXS DAC and ADC HP SHORT", mxs_adc);
 	if (ret) {
 		dev_err(&pdev->dev, "Unable to request ADC/DAC HP SHORT irq %d\n",
-		        mxs_adc->hp_short_irq);
+			mxs_adc->hp_short_irq);
 		return ret;
 	}
 
