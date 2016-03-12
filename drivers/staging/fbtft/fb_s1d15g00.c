@@ -95,10 +95,10 @@ static int write_vmem12_bus9(struct fbtft_par *par, size_t offset, size_t len)
 	buf_len = par->txbuf.len - (par->txbuf.len % 24);
 	tx_array_size = buf_len / 2;
 
-	while (j < len / 2) {
+	while (j * 2 < len) {
 		i = 0;
 
-		while (i < buf_len / 2) {
+		while (i * 2 < buf_len) {
 			/* convert odd pixel to 12 bit */
 			txbuf16[i]  = 0x0100;
 			txbuf16[i] |= RGB565_R4(vmem16[j]) << 4;
@@ -109,7 +109,7 @@ static int write_vmem12_bus9(struct fbtft_par *par, size_t offset, size_t len)
 			txbuf16[i] |= RGB565_B4(vmem16[j]) << 4;
 			j++;
 
-			if (j >= len / 2) {
+			if (j * 2 >= len) {
 				i++;
 				break;
 			}
@@ -124,12 +124,12 @@ static int write_vmem12_bus9(struct fbtft_par *par, size_t offset, size_t len)
 			i++;
 			j++;
 
-			if (j >= len / 2)
+			if (j * 2 >= len)
 				break;
 		}
 
 		/* fill up with NOP */
-		if (j >= len / 2) {
+		if (j * 2 >= len) {
 			while (i % 4) {
 				txbuf16[i] = 0x0000;
 				i++;
