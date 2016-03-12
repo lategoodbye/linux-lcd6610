@@ -63,9 +63,9 @@
 #define EPSON_NOP         0x25
 
 /* 16 bit to 12 bit conversion helper */
-#define RGB565_R4(c) (((c & 0xF800) >> 11) * 15 / 31)
-#define RGB565_G4(c) (((c & 0x07E0) >> 5) * 15 / 63)
-#define RGB565_B4(c) ((c & 0x001F) * 15 / 31)
+#define RGB565_R4(c) ((c & 0xF800) >> 12)
+#define RGB565_G4(c) ((c & 0x07E0) >> 7)
+#define RGB565_B4(c) ((c & 0x001F) >> 1)
 
 static short alpha = 32;
 module_param(alpha, short, 0);
